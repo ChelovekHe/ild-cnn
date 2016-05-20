@@ -1,0 +1,11 @@
+*.pyc
+powerpoint/
+preprocessing/
+HUG/
+HUG2/
+HUG2 copy/
+.ipynb_checkpoints*
+patches/
+predict/
+ild_cnn/
+.ipynb_checkpoints/
