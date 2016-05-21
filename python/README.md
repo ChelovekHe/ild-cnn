@@ -15,18 +15,19 @@ output files:
 
 ### Description:
 Helper file called in by main.py to load the data and other utilities functions
+
 input files:
-	.pkl files
+	   .pkl files
 output files:
-	ILD_CNN_model.json
-	ILD_CNN_model_weights
+	   ILD_CNN_model.json
+	   ILD_CNN_model_weights
 
      cnn_model.py
 
 ### Description:
 model description, compilation and evaluation
 input files:
-	.pkl files
+	   .pkl files
 output files:
-	ILD_CNN_model.json
-	ILD_CNN_model_weights
+	   ILD_CNN_model.json
+	   ILD_CNN_model_weights
