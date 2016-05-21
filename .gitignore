@@ -6,6 +6,7 @@ HUG2/
 HUG2 copy/
 .ipynb_checkpoints*
 patches/
+patches_old/
 predict/
 ild_cnn/
 .ipynb_checkpoints/
