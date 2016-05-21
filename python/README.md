@@ -1,6 +1,6 @@
-# README 
+# README
 
-## Python files 
+## Python files
 
      main.py
 
@@ -14,7 +14,7 @@ output files:
      ild_helpers.py
 
 ### Description:
-Helper file called in by main.py to load the data and other utility functions
+Helper file called in by main.py to load the data and other utilities functions
 input files:
 	.pkl files
 output files:
