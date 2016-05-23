@@ -179,7 +179,7 @@ for f in listpatient:
     os.mkdir(doj)
     (preclass,preprob)=loadpkl(f,do)
    
-    #we build the list of pach names in patient database
+    #we build the list of patch names in patient database
     listnamepatch=[]
     pathbmp=os.path.join(dirpatientpatchdb,f)
     listbmppatch= os.listdir(pathbmp)
