@@ -43,7 +43,7 @@ train_params = {
      'cl' : int(args.cl) if args.cl else 5,            # Number of Convolutional Layers
      'opt': args.opt if args.opt else 'Adam',          # Optimizer: SGD, Adagrad, Adam
      'obj': args.obj if args.obj else 'ce',            # Minimization Objective: mse, ce
-     'patience' : args.pat if args.pat else 100,       # Patience parameter for early stoping
+     'patience' : args.pat if args.pat else 200,       # Patience parameter for early stoping
      'tolerance': args.tol if args.tol else 1.005,     # Tolerance parameter for early stoping [default: 1.005, checks if > 0.5%]
      'res_alias': args.csv if args.csv else 'res'      # csv results filename alias
 }
