@@ -41,14 +41,14 @@ generates bmp files from dicom for scan and lung mask
 	prepascanmask.py: 
 generates patches from the scan images
 
-Prediction_data_preprocessing.py: 
+	Prediction_data_preprocessing.py: 
 arrange patches for prediction machines
 
 	ILD_CNN_Predict.py: 
 actual prediction
 
 	visuapredict.py: 
-	generate visualisation of predicted result in predict/<patient>/predicted_results
+generate visualisation of predicted result in predict/<patient>/predicted_results
 Creates also a visu_errorfile.txt in <predict> with statistics on labels.
 
 	predictionpython.bat: 
