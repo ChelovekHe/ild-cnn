@@ -44,3 +44,10 @@ To run the full prediction, we need:
 Inputs: the scan ang lung mask in "predict" directory as <patient> subdirectories, the CNN model and weights in "pickle" directory
 Output: jpeg of scan images with predicted labels in "predict"/<patient>/"predicted_results"
 predictlog.txt in "predict" with statistics on labels and error messages if any.
+
+	genepatchFromScan.py
+### Description:
+Generate patches from dicom database.
+Embeds all the sub routines, no need for other file
+Input: dcm database in "HUG" / <top_level dir>(default ILD_TXT)
+output: patch database, statistics on patches: label, localization, number,...
