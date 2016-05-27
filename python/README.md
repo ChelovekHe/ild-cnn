@@ -33,17 +33,14 @@ output files:
 	   ILD_CNN_model_weights
 	   
 	predict.py: 
+### Description:
 Fully stand alone file to predict label from dcom.
-	-generates bmp files from dicom for scan and lung mask(optional)
-	-generates patches from the scan images
-	-arrange patches for prediction machines
-	-actual prediction with CNN
-	-generate visualisation of predicted result in predict/<patient>/predicted_results
-	C
+Generates bmp files from dicom for scan and lung mask(optional)
+Generates patches from the scan images
+Arrange patches for prediction machines
+Actual prediction with CNN
+Generate visualisation of predicted result in predict/<patient>/predicted_results
 To run the full prediction, we need:
-Inputs
-	-the scan ang lung mask in "predict" directory as <patien> subdirectories
-	-the CNN model and weights in "pickle" directory
-Output:
-jpeg of scan images with predicted labels in preedict/<patient>/predicted_results
-predictlog.txt in <predict> with statistics on labels and error messages if any
+Inputs: the scan ang lung mask in "predict" directory as <patient> subdirectories, the CNN model and weights in "pickle" directory
+Output: jpeg of scan images with predicted labels in "predict"/<patient>/"predicted_results"
+predictlog.txt in "predict" with statistics on labels and error messages if any.
