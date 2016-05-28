@@ -51,10 +51,8 @@ Xrefpkl='X_file_reference.pkl'
 #subdirectory name to colect pkl files resulting from prediction
 picklefile='pickle'
 
-
 cwd=os.getcwd()
 (cwdtop,tail)=os.path.split(cwd)
-
 
 path_patient = os.path.join(cwdtop,namedirtop)
 #print PathDicom
@@ -64,7 +62,8 @@ patient_list= os.walk(path_patient).next()[1]
 #end predict part
 #########################################################
 # general
-
+#to enhance contrast on patch put True
+contrast=False
 #image  patch format
 typei='bmp' #can be jpg
 #dicom file size in pixels
@@ -89,7 +88,7 @@ thrpatch = 0.8
 #font file imported in top directory
 font = ImageFont.truetype( 'arial.ttf', 20)
 #########################################################
-errorfile = open(path_patient+'/predicterrorfile.txt', 'w') 
+errorfile = open(path_patient+'/predictlog.txt', 'w') 
 
 #color of labels
 red=(255,0,0)
@@ -201,6 +200,15 @@ def genebmp(dirName):
                     scipy.misc.imsave(lungcoref, dslung.pixel_array)
 
 
+def normi(img):
+     tabi = np.array(img)
+#     print(tabi.min(), tabi.max())
+     tabi1=tabi-tabi.min()
+#     print(tabi1.min(), tabi1.max())
+     tabi2=tabi1*(255/float(tabi1.max()-tabi1.min()))
+#     print(tabi2.min(), tabi2.max())
+     return tabi2
+
 def pavgene (namedirtopcf):
         """ generate patches from scan"""
         print('generate patches on: ',f)
@@ -283,8 +291,12 @@ def pavgene (namedirtopcf):
         #               detect black patch
         #                print (imagemax)
                         if imagemax!=None:
-                            crorig.save(patchpathf+'/p_'+slicenumber+'_'+str(i)+'_'+\
-                                   str(j)+'.'+typei)
+                            namepatch=patchpathf+'/p_'+slicenumber+'_'+str(i)+'_'+str(j)+'.'+typei
+                            if contrast:
+                                    tabcont=normi(crorig)
+                                    scipy.misc.imsave(namepatch, tabcont)
+                            else:
+                                crorig.save(namepatch)
                                    #we draw the rectange
                             x=0
                             while x < dimpavx:
@@ -301,7 +313,7 @@ def pavgene (namedirtopcf):
                  i+=dimpavx
         #    im = plt.matshow(tabf)
         #    plt.colorbar(im,label='with pavage')
-             scipy.misc.imsave(jpegpathf+'/'+'s_'+slicenumber+'.jpg', tabf)
+             scipy.misc.imsave(jpegpathf+'/'+'s_'+slicenumber+'.bmp', tabf)
         
 def dataprocessing(patient_dir_s):
     
@@ -444,19 +456,86 @@ def loadpkl(do):
     dd.close()  
     return (preclass,preprob,prexfile)
 
+
+        
+def scanx(tab):
+    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
+    for x in interv(1,dimtabx-1):
+        for y in interv(1,dimtaby-1):
+            if tab[x][y-1]==0 and tab[x][y]>0:
+                tabh[x][y]=tab[x][y]
+            elif tab[x][y-1]==0 and tab[x][y]==0:
+                tabh[x][y]=0
+            elif tab[x][y-1]>0 and tab[x][y]==0:
+              tabh[x][y-1]=tab[x][y-1]
+            elif tab[x][y-1]>0 and tab[x][y]>0:
+                if tab[x][y-1] == tab[x][y]:
+                    tabh[x][y]=0
+                else:
+                    tabh[x][y]=tab[x][y] 
+                    tabh[x][y-1]=tab[x][y-1]
+
+    return tabh
+    
+def scany(tab):
+    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
+    for y in interv(1,dimtaby-1):
+        for x in interv(1,dimtabx-1):
+            if tab[x-1][y]==0 and tab[x][y]>0:
+                tabh[x][y]=tab[x][y]
+            elif tab[x-1][y]==0 and tab[x][y]==0:
+                tabh[x][y]=0
+            elif tab[x-1][y]>0 and tab[x][y]==0:
+              tabh[x-1][y]=tab[x-1][y]
+            elif tab[x-1][y]>0 and tab[x][y]>0:
+                if tab[x-1][y] == tab[x][y]:
+                    tabh[x][y]=0
+                else:
+                    tabh[x][y]=tab[x][y]
+                    tabh[x-1][y]=tab[x-1][y]
+    return tabh
+
+
+    return tabh         
+def merg(tabs,tabp):
+    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
+    for y in interv(0,dimtaby-1):
+        for x in interv(0,dimtabx-1):
+            if tabp[x][y]>0:
+                tabh[x][y]=tabp[x][y]
+            else:
+                tabh[x][y]=tabs[x][y]
+    return tabh 
+
+def contour(tab):
+     tabx=scanx(tab)
+     taby=scany(tab)
+     tabi=merg(tabx,taby)
+     return tabi
+
+
+def mergcolor(tabs,tabp):
+    tabh= np.zeros((dimtabx, dimtaby,3), dtype='i')
+    
+    for y in interv(0,dimtaby-1):
+        for x in interv(0,dimtabx-1):
+            
+            if tabp[x][y]>0:
+                prec= tabp[x][y]-100
+                classlabel=fidclass(prec)
+                classcolor=classifc[classlabel]
+                tabh[x][y]=classcolor
+            else:
+                tabh[x][y]=tabs[x][y]
+    return tabh 
 def  visua(dirpatientdb):
     print('visualise work on: ',f)
-
     #directory name with predict out dabasase, will be created in current directory
     predictout_dir = os.path.join(dirpatientdb, predictout)
     remove_folder(predictout_dir)
     os.mkdir(predictout_dir)   
-
     (preclass,preprob,listnamepatch)=loadpkl(dirpatientdb)
-
-
     dirpatientfdb=os.path.join(dirpatientdb,scanbmp)
-
     listbmpscan=os.listdir(dirpatientfdb)
     listlabelf={}
 #    setname=f
@@ -484,6 +563,7 @@ def  visua(dirpatientdb):
         ill = 0
       
         foundp=False
+        tabsi = np.zeros((dimtabx, dimtaby), dtype='i')
         for ll in listnamepatch:
 #            print ('1',ll)
             #we read patches in predict/ setnumber and found localisation    
@@ -538,17 +618,15 @@ def  visua(dirpatientdb):
                     while x < dimpavx:
                         y=0
                         while y < dimpavy:
-                            tablscan[y+ypat][x+xpat]=classcolor
-                            if x == 0 or x == dimpavx-1 :
-                                y+=1
-                            else:
-                                y+=dimpavy-1
+                            tabsi[y+ypat][x+xpat]=prec+100
+                            y+=1    
                         x+=1
 
-        
-        imgcorefull=imgcore+'.jpg'
+  
+        tablscanc =mergcolor(tablscan,contour(tabsi))
+        imgcorefull=imgcore+'.bmp'
         imgname=os.path.join(predictout_dir,imgcorefull)
-        scipy.misc.imsave(imgname, tablscan)
+        scipy.misc.imsave(imgname, tablscanc)
         textw='n: '+f+' scan: '+str(slicenumber)
         tagviews(imgname,textw,0,20)
         if foundp:
@@ -572,7 +650,7 @@ for f in patient_list:
     #f = 35
     print('work on:',f)
     namedirtopcf = os.path.join(path_patient,f)
-    print namedirtopcf
+#    print namedirtopcf
     if os.path.isdir(namedirtopcf):
         genebmp(namedirtopcf)
         pavgene(namedirtopcf)
