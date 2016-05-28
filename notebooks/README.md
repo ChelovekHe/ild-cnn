@@ -1,6 +1,7 @@
 # README 
 
-## Notebook files 
+## Notebook files
+updated: May 28, 2016 
 
 
      TrainingDataCreation.ipynb
@@ -19,10 +20,17 @@ Saves the sets into the pickl directory in 6 files
 review patches in batches of 20 or individually
 
 
+       ShowPatientResults.ipynb
+     
+### Description:
+The ID of a patient is chosen and then you can browse through the jpeg images with the results.
+
+
        ResultPlotting.ipynb
      
 ### Description:
 Plotting loss functions and confusion matrices
+Not complete
 
 issues: only fragment od functionality available so far
 
@@ -36,6 +44,8 @@ Plotting confusion matrix tests
         visuapredict.ipynb  
 
 ### Description
+
+don't use! not complete
 notebook version of the visual prediction of the prediction results
 
 
