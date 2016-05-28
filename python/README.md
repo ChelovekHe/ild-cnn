@@ -42,8 +42,9 @@ Actual prediction with CNN
 Generate visualisation of predicted result in predict/<patient>/predicted_results
 To run the full prediction, we need:
 Inputs: the scan ang lung mask in "predict" directory as <patient> subdirectories, the CNN model and weights in "pickle" directory
-Output: jpeg of scan images with predicted labels in "predict"/<patient>/"predicted_results"
+Output: bmp of scan images with predicted labels in "predict"/<patient>/"predicted_results" and ROI
 predictlog.txt in "predict" with statistics on labels and error messages if any.
+Parameter to enhance contrast (all in 0 255): "contrast" (default = False) at beginning of file
 
 	genepatchFromScan.py
 ### Description:
