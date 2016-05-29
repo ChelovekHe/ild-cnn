@@ -31,7 +31,8 @@ jpegpath = 'patch_jpeg'
 lungmask='lung_mask'
 #directory to put  lung mask bmp
 lungmaskbmp='bmp'
-
+#directory name with scan with roi
+sroi='sroi'
 #directory with bmp from dicom
 scanbmp='scan_bmp'
 #directory for bmp from dicom
@@ -537,6 +538,7 @@ def  visua(dirpatientdb):
     os.mkdir(predictout_dir)   
     (preclass,preprob,listnamepatch)=loadpkl(dirpatientdb)
     dirpatientfdb=os.path.join(dirpatientdb,scanbmp)
+    dirpatientfsdb=os.path.join(dirpatientdb,sroi)
     listbmpscan=os.listdir(dirpatientfdb)
     listlabelf={}
 #    setname=f
@@ -544,7 +546,12 @@ def  visua(dirpatientdb):
     for img in listbmpscan:
         listlabel={}
         listlabelaverage={}
-        imgc=os.path.join(dirpatientfdb,img)
+        if os.path.exists(dirpatientfsdb):
+#        imgc=os.path.join(dirpatientfdb,img)
+            imgc=os.path.join(dirpatientfsdb,img)
+        else:
+            imgc=os.path.join(dirpatientfdb,img)
+
 #        print img  
         endnumslice=img.find('.'+typei)
         imgcore=img[0:endnumslice]
