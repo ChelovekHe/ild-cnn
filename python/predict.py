@@ -1,5 +1,5 @@
 # coding: utf-8
-#Sylvain Kritter 24 mai 2016
+#Sylvain Kritter 29 mai 2016
 """general parameters and file, directory names"""
 
 import os
