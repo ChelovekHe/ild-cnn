@@ -1,5 +1,5 @@
 # coding: utf-8
-#Sylvain Kritter 29 mai 2016
+#Sylvain Kritter 24 mai 2016
 """general parameters and file, directory names"""
 
 import os
@@ -652,7 +652,32 @@ def  visua(dirpatientdb):
 #          print string
           errorfile.write(string )
 
-       
+def renomscan(fa):
+#    print(subdir)
+        #subdir = top/35
+        print('renomscan on:',f)
+        num=0
+        contenudir = os.listdir(fa)
+#        print(contenudir)
+        for ff in contenudir:
+#            print fi
+            if ff.find('.dcm')>0 and ff.find('-')<0:     
+                num+=1    
+                corfpos=ff.find('.dcm')
+                cor=ff[0:corfpos]
+                ncff=os.path.join(f,ff)
+                if num<10:
+                    nums='000'+str(num)
+                elif num<100:
+                    nums='00'+str(num)
+                elif num<1000:
+                    nums='0'+str(num)
+                else:
+                    nums=str(num)
+                newff=cor+'-'+nums+'.dcm'
+    #            print(newff)
+                shutil.copyfile(ncff,os.path.join(fa,newff) )
+                os.remove(ncff)
 
 for f in patient_list:
     #f = 35
@@ -660,6 +685,7 @@ for f in patient_list:
     namedirtopcf = os.path.join(path_patient,f)
 #    print namedirtopcf
     if os.path.isdir(namedirtopcf):
+        renomscan(namedirtopcf)
         genebmp(namedirtopcf)
         pavgene(namedirtopcf)
         dataprocessing(namedirtopcf)
