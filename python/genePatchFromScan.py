@@ -15,7 +15,9 @@ from PIL import Image, ImageFont, ImageDraw
 #global directory for scan file
 namedirHUG = 'HUG'
 #subdir for roi in text
+#subHUG='ILD_TXT'
 subHUG='ILD_TXT'
+
 #define the name of directory for patches
 patchesdirname = 'patches'
 #define the name of directory for normalised patches
@@ -24,7 +26,7 @@ patchesNormdirname = 'patches_norm'
 imagedirname='patches_jpeg'
 #define name for image directory in patient directory 
 bmpname='bmp'
-#dierctory name with scan with roi
+#directory name with scan with roi
 sroi='sroi'
 #full path names
 cwd=os.getcwd()
@@ -74,7 +76,7 @@ font = ImageFont.truetype( 'arial.ttf', 20)
 ##error file
 errorfile = open(namedirtopc+'genepatcherrortop.txt', 'w')
 #filetowrite=os.path.join(namedirtopc,'lislabel.txt')
-mf=open(namedirtopc+'lislabel.txt',"w")
+mflabel=open(namedirtopc+'lislabel.txt',"w")
 
 #end customisation part for datataprep
 #######################################################
@@ -93,7 +95,19 @@ classif ={
 'ground_glass':2,
 'healthy':3,
 'micronodules':4,
-'reticulation':5}
+'reticulation':5,
+
+'air_trapping':6,
+ 'bronchial_wall_thickening':7,
+ 'bronchiectasis':8,
+ 'cysts':9,
+ 'early_fibrosis':10,
+ 'emphysema':11,
+ 'increased_attenuation':12,
+ 'macronodules':13,
+ 'pcp':14,
+ 'peripheral_micronodules':15,
+ 'tuberculosis':16}
 
 classifc ={
 'consolidation':red,
@@ -101,7 +115,19 @@ classifc ={
 'ground_glass':yellow,
 'healthy':green,
 'micronodules':cyan,
-'reticulation':purple}
+'reticulation':purple,
+
+'air_trapping':white,
+ 'bronchial_wall_thickening':white,
+ 'bronchiectasis':white,
+ 'cysts':white,
+ 'early_fibrosis':white,
+ 'emphysema':white,
+ 'increased_attenuation':white,
+ 'macronodules':white,
+ 'pcp':white,
+ 'peripheral_micronodules':white,
+ 'tuberculosis':white}
 
 #end log files
 def fidclass(numero):
@@ -593,7 +619,7 @@ def pavs (tabc,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
                             nbp+=1
                             nampa='/'+label+'/'+loca+'/'+f+'_'+iln+'_'+str(nbp)+'.'+typei 
                             crorig.save(patchpath+nampa)
-
+#normalize patches and put in patches_norm
                             tabi2=normi(crorig)
                             scipy.misc.imsave(patchNormpath+nampa, tabi2)
                         
@@ -630,9 +656,9 @@ def pavs (tabc,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
         errorfile.write('ERROR image not found '+namedirtopcf+\
         '/'+typei+'/'+n+'\n')#####
     tabp =tab+tabp
-    mf=open(jpegpath+'/'+f+'_'+iln+'.txt',"w")
-    mf.write('#number of patches: '+str(nbp)+'\n'+strpac)
-    mf.close()
+    mfl=open(jpegpath+'/'+f+'_'+iln+'.txt',"w")
+    mfl.write('#number of patches: '+str(nbp)+'\n'+strpac)
+    mfl.close()
     scipy.misc.imsave(jpegpath+'/'+f+'_'+iln+'.jpg', tabp)
     if len(errorliststring) >0:
         for l in errorliststring:
@@ -769,25 +795,52 @@ def fileext(namefile,curdir,patchpath):
 #    print('total number of contour',nset,'in:' , namefile)
     return(listlabel,coefi)
 
+def renomscan(f):
+  
+#    print(subdir)
+        #subdir = top/35
+        dd1=os.listdir(f)
+        num=0
+        for ff in dd1:     
+    
+#          print(ff)
+          if ff.find('dcm') >0 :
+#                    print(ff)
+            num+=1
 
-mf.write('label  _  localisation\n')
-mf.write('======================\n')
+            corfpos=ff.find('.dcm')
+            cor=ff[0:corfpos]
+            ncff=os.path.join(f,ff)
+            if num<10:
+                nums='000'+str(num)
+            elif num<100:
+                nums='00'+str(num)
+            elif num<1000:
+                nums='0'+str(num)
+            else:
+                nums=str(num)
+            newff=cor+'-'+nums+'.dcm'
+#            print(newff)
+            shutil.copyfile(ncff,os.path.join(f,newff) )
+            os.remove(ncff)
+
 
 npat=0
 for f in listdirc:
     #f = 35
     print('work on:',f)
-    mf.write(f+'\n')
+#    mf.write(f+'\n')
     nbpf=0
     posp=f.find('.',0)
     posu=f.find('_',0)
     namedirtopcf=namedirtopc+'/'+f
-
+  
+    
     if os.path.isdir(namedirtopcf):    
         sroidir=os.path.join(namedirtopcf,sroi)
         remove_folder(sroidir)
         os.mkdir(sroidir)
-        genebmp(namedirtopcf)
+       
     remove_folder(namedirtopcf+'/patchfile')
     #namedirtopcf = final/ILD_DB_txtROIs/35
     if posp==-1 and posu==-1:
@@ -797,7 +850,15 @@ for f in listdirc:
         if  'patchfile' not in contenudir:
             os.mkdir(namedirtopcf+'/patchfile')
         fif=False
+        for fi in contenudir:
+#            print fi
+            if fi.find('.dcm')>0 and fi.find('-')<0:
+                renomscan(namedirtopcf)
+                contenudir = os.listdir(namedirtopcf)
+                break
+        genebmp(namedirtopcf)
         for f1 in contenudir:
+            
             if f1.find('.txt') >0 and (f1.find('CT')==0 or \
              f1.find('Tho')==0):
                 npat+=1
@@ -809,10 +870,10 @@ for f in listdirc:
              
                 labell,coefi =fileext(pathf1,namedirtopcf,patchpath)
 #                print(label,loca)
-                for ff in labell:
+#                for ff in labell:
 #                    print ff
-                    mf.write(str(ff)+'\n')
-                mf.write('--------------------------------\n')
+#                    mf.write(str(ff)+'\n')
+#                mf.write('--------------------------------\n')
                 break
         if not fif:
              print('ERROR: no ROI txt content file', f)
@@ -910,9 +971,9 @@ for npp in contenupatcht:
 ofilepwt = open(jpegpath+'/totalnbpat.txt', 'w')
 ofilepwt.write('number of patches: '+str(npatcht))
 ofilepwt.close()
-mf.write('================================\n')
-mf.write('number of datasets:'+str(npat)+'\n')
-mf.close()
+#mf.write('================================\n')
+#mf.write('number of datasets:'+str(npat)+'\n')
+#mf.close()
 #################################################################
 #data statistics on paches
 #nametopc=os.path.join(cwd,namedirtop)
@@ -954,6 +1015,53 @@ for dirnam in dirlabel:
         filepwt.write('label: '+label+' localisation: '+loca+\
         ' number of patches: '+str(n)+'\n')
 filepwt.close() 
+
+#write the log file with label list
+mflabel.write('label  _  localisation\n')
+mflabel.write('======================\n')
+categ=os.listdir(jpegpath)
+for f in categ:
+    if f.find('.txt')>0 and f.find('nb')==0:
+        ends=f.find('.txt')
+        debs=f.find('_')
+        sln=f[debs+1:ends]
+        listlabel={}
+        for f1 in categ:
+                if  f1.find(sln+'_')==0 and f1.find('.txt')>0:
+                    debl=f1.find('slice_')
+                    debl1=f1.find('_',debl+1)
+                    debl2=f1.find('_',debl1+1)
+                    endl=f1.find('.txt')
+                    j=0
+                    while f1.find('_',endl-j)!=-1:
+                        j-=1
+                    label=f1[debl2+1:endl-j-2]
+                    ffle1=os.path.join(jpegpath,f1)
+                    fr1=open(ffle1,'r')
+                    t1=fr1.read()
+                    fr1.close()
+                    debsp=t1.find(':')
+                    endsp=  t1.find('\n')
+                    np=int(t1[debsp+1:endsp])
+                    if label in listlabel:
+                                listlabel[label]=listlabel[label]+np
+                    else:
+                        listlabel[label]=np
+        listslice.append(sln)
+        ffle=os.path.join(jpegpath,f)
+        fr=open(ffle,'r')
+        t=fr.read()
+        fr.close()
+        debs=t.find(':')
+        ends=len(t)
+        nump= t[debs+1:ends]
+        mflabel.write(sln+' number of patches: '+nump+'\n')
+        for l in listlabel:
+            mflabel.write(l+' '+str(listlabel[l])+'\n')
+        mflabel.write('---------------------'+'\n')
+
+mflabel.close()
+
 ##########################################################
 errorfile.write('completed')
 errorfile.close()
