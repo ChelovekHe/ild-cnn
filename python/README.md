@@ -45,6 +45,7 @@ Inputs: the scan ang lung mask in "predict" directory as <patient> subdirectorie
 Output: bmp of scan images with predicted labels in "predict"/<patient>/"predicted_results" and ROI
 predictlog.txt in "predict" with statistics on labels and error messages if any.
 Parameter to enhance contrast (all in 0 255): "contrast" (default = True) at beginning of file
+Add superposition of txt roi  from sroi directory if exists in visualization
 
 	genepatchFromScan.py
 ### Description:
