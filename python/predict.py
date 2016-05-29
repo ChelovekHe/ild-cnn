@@ -63,7 +63,7 @@ patient_list= os.walk(path_patient).next()[1]
 #########################################################
 # general
 #to enhance contrast on patch put True
-contrast=False
+contrast=True
 #image  patch format
 typei='bmp' #can be jpg
 #dicom file size in pixels
@@ -143,6 +143,7 @@ def remove_folder(path):
     if os.path.exists(path):
          # remove if exists
          shutil.rmtree(path)
+
 
 def interv(borne_inf, borne_sup):
     """Générateur parcourant la série des entiers entre borne_inf et borne_sup.
