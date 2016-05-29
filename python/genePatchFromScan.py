@@ -1,12 +1,12 @@
 # coding: utf-8
-#Sylvain Kritter 26 mai 2016
+#Sylvain Kritter 29 mai 2016
 """Top file to generate patches from DICOM database"""
 import os
 import numpy as np
 import shutil
 import scipy.misc
 import dicom
-from PIL import Image
+from PIL import Image, ImageFont, ImageDraw
     
 """general parameters and file, directory names"""
 
@@ -18,11 +18,14 @@ namedirHUG = 'HUG'
 subHUG='ILD_TXT'
 #define the name of directory for patches
 patchesdirname = 'patches'
+#define the name of directory for normalised patches
+patchesNormdirname = 'patches_norm'
 #define the name for jpeg files
 imagedirname='patches_jpeg'
 #define name for image directory in patient directory 
 bmpname='bmp'
-
+#dierctory name with scan with roi
+sroi='sroi'
 #full path names
 cwd=os.getcwd()
 (cwdtop,tail)=os.path.split(cwd)
@@ -36,6 +39,8 @@ if not os.path.exists(namedirtopc):
 #print namedirtopc
 #create patch and jpeg directory
 patchpath=os.path.join(cwdtop,patchesdirname)
+#create patch and jpeg directory
+patchNormpath=os.path.join(cwdtop,patchesNormdirname)
 #print patchpath
 #define the name for jpeg files
 jpegpath=os.path.join(cwdtop,imagedirname)
@@ -43,6 +48,8 @@ jpegpath=os.path.join(cwdtop,imagedirname)
 
 if not os.path.isdir(patchpath):
     os.mkdir(patchpath)   
+if not os.path.isdir(patchNormpath):
+    os.mkdir(patchNormpath)   
 if not os.path.isdir(jpegpath):
     os.mkdir(jpegpath)   
 #patchpath = final/patches
@@ -60,7 +67,7 @@ dimpavx =32
 dimpavy = 32
 #threshold for patch acceptance
 thrpatch = 0.8
-
+font = ImageFont.truetype( 'arial.ttf', 20)
 #end general part
 #########################################################
 #log files
@@ -71,10 +78,44 @@ mf=open(namedirtopc+'lislabel.txt',"w")
 
 #end customisation part for datataprep
 #######################################################
+#color of labels
+red=(255,0,0)
+green=(0,255,0)
+blue=(0,0,255)
+yellow=(255,255,0)
+cyan=(0,255,255)
+purple=(255,0,255)
+white=(255,255,255)
 
+classif ={
+'consolidation':0,
+'fibrosis':1,
+'ground_glass':2,
+'healthy':3,
+'micronodules':4,
+'reticulation':5}
+
+classifc ={
+'consolidation':red,
+'fibrosis':blue,
+'ground_glass':yellow,
+'healthy':green,
+'micronodules':cyan,
+'reticulation':purple}
 
 #end log files
-  
+def fidclass(numero):
+    """return class from number"""
+    found=False
+    for cle, valeur in classif.items():
+        
+        if valeur == numero:
+            found=True
+            return cle
+      
+    if not found:
+        return 'unknown'
+
 def remove_folder(path):
     """to remove folder"""
     # check if folder exists
@@ -92,7 +133,7 @@ def interv(borne_inf, borne_sup):
         borne_inf += 1
         
 def genebmp(dirName):
-    """generate patches from dicom files"""
+    """generate patches from dicom files and sroi"""
     print ('generate  bmp files from dicom files in :',dirName)
     #directory for patches
     bmp_dir = os.path.join(dirName, bmpname)
@@ -113,6 +154,21 @@ def genebmp(dirName):
 #            print imgcore
             bmpfile=os.path.join(bmp_dir,imgcore)
             scipy.misc.imsave(bmpfile, ds.pixel_array)
+            
+            posend=endnumslice
+            while filename.find('-',posend)==-1:
+                posend-=1
+            debnumslice=posend+1
+            slicenumber=int((filename[debnumslice:endnumslice])) 
+            namescan=os.path.join(sroidir,imgcore)                   
+            textw='n: '+f+' scan: '+str(slicenumber)
+            orign = Image.open(bmpfile)
+            imscanc= orign.convert('RGB')
+            tablscan = np.array(imscanc)
+            scipy.misc.imsave(namescan, tablscan)
+            tagviews(namescan,textw,0,20)            
+            
+            
 
 listlabel=[]
 #print(namedirtopc)
@@ -340,19 +396,119 @@ def reptfull(tabc,dx,dy):
 #  
     return tabz3
 
+def normi(img):
+     tabi = np.array(img)
+#     print(tabi.min(), tabi.max())
+     tabi1=tabi-tabi.min()
+#     print(tabi1.min(), tabi1.max())
+     tabi2=tabi1*(255/float(tabi1.max()-tabi1.min()))
+#     print(tabi2.min(), tabi2.max())
+     return tabi2
+
+
+        
+def scanx(tab):
+    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
+    for x in interv(1,dimtabx-1):
+        for y in interv(1,dimtaby-1):
+#            print (x,y)
+            if tab[x][y-1]==0 and tab[x][y]>0:
+                tabh[x][y]=tab[x][y]
+            elif tab[x][y-1]==0 and tab[x][y]==0:
+                tabh[x][y]=0
+            elif tab[x][y-1]>0 and tab[x][y]==0:
+              tabh[x][y-1]=tab[x][y-1]
+            elif tab[x][y-1]>0 and tab[x][y]>0:
+                if tab[x][y-1] == tab[x][y]:
+                    tabh[x][y]=0
+                else:
+                    tabh[x][y]=tab[x][y] 
+                    tabh[x][y-1]=tab[x][y-1]
+
+    return tabh
+    
+def scany(tab):
+    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
+    for y in interv(1,dimtaby-1):
+        for x in interv(1,dimtabx-1):
+            if tab[x-1][y]==0 and tab[x][y]>0:
+                tabh[x][y]=tab[x][y]
+            elif tab[x-1][y]==0 and tab[x][y]==0:
+                tabh[x][y]=0
+            elif tab[x-1][y]>0 and tab[x][y]==0:
+              tabh[x-1][y]=tab[x-1][y]
+            elif tab[x-1][y]>0 and tab[x][y]>0:
+                if tab[x-1][y] == tab[x][y]:
+                    tabh[x][y]=0
+                else:
+                    tabh[x][y]=tab[x][y]
+                    tabh[x-1][y]=tab[x-1][y]
+    return tabh
+
+
+    return tabh         
+def merg(tabs,tabp):
+    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
+    for y in interv(0,dimtaby-1):
+        for x in interv(0,dimtabx-1):
+            if tabp[x][y]>0:
+                tabh[x][y]=tabp[x][y]
+            else:
+                tabh[x][y]=tabs[x][y]
+    return tabh 
+
+def contour(tab):
+     tabx=scanx(tab)
+     taby=scany(tab)
+     tabi=merg(tabx,taby)
+     return tabi
+
+
+def mergcolor(tabs,tabp):
+    tabh= np.zeros((dimtabx, dimtaby,3), dtype='i')
+    
+    for y in interv(0,dimtaby-1):
+        for x in interv(0,dimtabx-1):
+            
+            if tabp[x][y]>0:
+                prec= tabp[x][y]-100
+                classlabel=fidclass(prec)
+                classcolor=classifc[classlabel]
+                tabh[x][y]=classcolor
+            else:
+                tabh[x][y]=tabs[x][y]
+    return tabh 
+
+def tagview(fig,text,x,y):
+    """write text in image according to label and color"""
+    imgn=Image.open(fig)
+    draw = ImageDraw.Draw(imgn)
+    col=classifc[text]
+
+    deltay=25*(classif[text]%3)
+    deltax=175*(classif[text]//3)
+    #print text, col
+    draw.text((x+deltax, y+deltay),text,col,font=font)
+    imgn.save(fig)
+
+def tagviews(fig,text,x,y):
+    """write simple text in image """
+    imgn=Image.open(fig)
+    draw = ImageDraw.Draw(imgn)
+    draw.text((x, y),text,white,font=font)
+    imgn.save(fig)
+
 def pavs (tabc,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
     iln,f,label,loca,typei,errorfile):
     """ generate patches from ROI"""
-    #namedirtopcf = final/ILD_DB_txtROIs/35
-    #jpegpath = final/jpeg
-    #patchpath = final/jpeg
-    #coefi=0.79296875
-   #iln=slice2micronodulesdiffuse
-    #label=micronodules
-   #loca=diffuse
-    #typei = bmp
-#    print('enter pavs')
+    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
+    for y in interv(0,dimtaby-1):
+        for x in interv(0,dimtabx-1):
+            if tab[x][y]>0:
+                tabh[x][y]=100+classif[label]
 
+    newtab=contour(tabh)
+   
     mintaby= min(511,tabc.take([1],axis=1).min())
     maxtaby= min(511,tabc.take([1],axis=1).max())
     mintabx= min(511,tabc.take([0],axis=1).min())
@@ -384,10 +540,26 @@ def pavs (tabc,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
     maxj=max(mintaby-py,0)
     errorliststring=[]
     for  n in contenujpg:
-#                    print (area,n,i,j)
-#                    print(slns)
+            
+        #                    print(slns)
         if n.find(slns)>0:
-            orig = Image.open(namedirtopcf+'/'+typei+'/'+n)
+            namebmp=namedirtopcf+'/'+typei+'/'+n   
+            namescan=os.path.join(sroidir,n)   
+#            namebmp=namedirtopcf+'/'+typei+'/'+n
+            orig = Image.open(namebmp)
+#            print n
+            orign = Image.open(namescan)
+            imscanc= orign.convert('RGB')
+           
+            tablscan = np.array(imscanc)
+            tabcolor=mergcolor(tablscan,newtab)
+#            print('1')
+            
+#            print namescan
+            scipy.misc.imsave(namescan, tabcolor)
+            tagview(namescan,label,175,00)
+            
+            
             while i <= mini:
                 j=maxj
                 while j<=minj:
@@ -409,7 +581,7 @@ def pavs (tabc,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
                          #detect black pixels
                          #imagemax=(crorig.getextrema())
                         imagemax=crorig.getbbox()
-#                         print (imagemax)
+                     
                         if imagemax==None:
 
                             errortext='black pixel in: '+ f+' '+ iln+'\n'
@@ -419,8 +591,11 @@ def pavs (tabc,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
 #                          
                         else:
                             nbp+=1
-                            crorig.save(patchpath+'/'+label+'/'+loca+'/'+f+\
-                             '_'+iln+'_'+str(nbp)+'.'+typei)
+                            nampa='/'+label+'/'+loca+'/'+f+'_'+iln+'_'+str(nbp)+'.'+typei 
+                            crorig.save(patchpath+nampa)
+
+                            tabi2=normi(crorig)
+                            scipy.misc.imsave(patchNormpath+nampa, tabi2)
                         
                         
                         #                print('pavage',i,j)
@@ -517,13 +692,19 @@ def fileext(namefile,curdir,patchpath):
         if label not in listlabel:
                     plab=os.path.join(patchpath,label)
                     ploc=os.path.join(plab,loca) 
+                    plabNorm=os.path.join(patchNormpath,label)
+#                    print plabNorm
+                    plocNorm=os.path.join(plabNorm,loca) 
                     listlabel.append(label+'_'+loca)     
                     listlabeld=os.listdir(patchpath)
                     if label not in listlabeld:
                             os.mkdir(plab)
+                            os.mkdir(plabNorm)
                     listlocad=os.listdir(plab)
                     if loca not in listlocad:
                             os.mkdir(ploc)
+                            os.mkdir(plocNorm)
+                            
 
         condslap=True
         slapos=t.find('slice',labpos)
@@ -602,14 +783,17 @@ for f in listdirc:
     posu=f.find('_',0)
     namedirtopcf=namedirtopc+'/'+f
 
-    if os.path.isdir(namedirtopcf):
+    if os.path.isdir(namedirtopcf):    
+        sroidir=os.path.join(namedirtopcf,sroi)
+        remove_folder(sroidir)
+        os.mkdir(sroidir)
         genebmp(namedirtopcf)
     remove_folder(namedirtopcf+'/patchfile')
     #namedirtopcf = final/ILD_DB_txtROIs/35
     if posp==-1 and posu==-1:
         contenudir = os.listdir(namedirtopcf)
 #        print(contenudir)
-     
+   
         if  'patchfile' not in contenudir:
             os.mkdir(namedirtopcf+'/patchfile')
         fif=False
@@ -649,7 +833,7 @@ for f in listdirc:
     #pathl=final/ILD_DB_txtROIs/35/patchfile/slice_2_micronodulesdiffuse_1.txt
 #        print('listcore',listcore)
         for c in listcore:
-            
+#            print c
             ftab=True
             tabzc = np.zeros((dimtabx, dimtaby), dtype='i')
             for l in listslice:
@@ -684,12 +868,12 @@ for f in listdirc:
                         ftab=False
                     
                     reftab=np.concatenate((reftab,tabc),axis=0)
-                    
+                    print (l,c)
                     print('end create tables')
                     il=l.find('.',0)
                     iln=l[0:il]
 #                    print iln
-
+            
             print('creates patches from:',iln, 'in:', f)
             nbp,tabz1=pavs (reftab,tabzc,dimtabx,dimtaby,dimpavx,dimpavy,namedirtopcf,\
                 jpegpath, patchpath,thrpatch,iln,f,label,loca,typei,errorfile)
