@@ -660,12 +660,13 @@ def renomscan(fa):
         contenudir = os.listdir(fa)
 #        print(contenudir)
         for ff in contenudir:
-#            print fi
+#            print ff
             if ff.find('.dcm')>0 and ff.find('-')<0:     
                 num+=1    
                 corfpos=ff.find('.dcm')
                 cor=ff[0:corfpos]
-                ncff=os.path.join(f,ff)
+                ncff=os.path.join(fa,ff)
+#                print ncff
                 if num<10:
                     nums='000'+str(num)
                 elif num<100:
