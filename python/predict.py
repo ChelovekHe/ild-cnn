@@ -15,7 +15,8 @@ import cnn_model as CNN4
 
 #########################################################
 # for predict
-
+#to enhance contrast on patch put True
+contrast=False
 #global directory for predict file
 namedirtop = 'predict'
 
@@ -37,11 +38,9 @@ sroi='sroi'
 scanbmp='scan_bmp'
 #directory for bmp from dicom
 #bmpname='bmp'
-#threshold for probability prediction
-thrproba = 0.8
 
 #pickle with predicted classes
-predicted_classes = 'predicted_classes.pkl'
+#predicted_classes = 'predicted_classes.pkl'
 
 #pickle with predicted probabilities
 predicted_proba= 'predicted_probabilities.pkl'
@@ -63,8 +62,6 @@ patient_list= os.walk(path_patient).next()[1]
 #end predict part
 #########################################################
 # general
-#to enhance contrast on patch put True
-contrast=True
 #image  patch format
 typei='bmp' #can be jpg
 #dicom file size in pixels
@@ -84,6 +81,8 @@ minj=dimtaby-dimpavy
 pxy=float(dimpavx*dimpavy)
 #threshold for patch acceptance
 thrpatch = 0.8
+#threshold for probability prediction
+thrproba = 0.9
 
 #end general part
 #font file imported in top directory
@@ -132,11 +131,9 @@ train_params = {
      'patience' : args.pat if args.pat else 5,         # Patience parameter for early stoping
      'tolerance': args.tol if args.tol else 1.005,     # Tolerance parameter for early stoping [default: 1.005, checks if > 0.5%]
      'res_alias': args.csv if args.csv else 'res'      # csv results filename alias
-                }
+     }
 model = H.load_model()
 model.compile(optimizer='Adam', loss=CNN4.get_Obj(train_params['obj']))
-
-
 
 def remove_folder(path):
     """to remove folder"""
@@ -144,7 +141,6 @@ def remove_folder(path):
     if os.path.exists(path):
          # remove if exists
          shutil.rmtree(path)
-
 
 def interv(borne_inf, borne_sup):
     """Générateur parcourant la série des entiers entre borne_inf et borne_sup.
@@ -201,8 +197,8 @@ def genebmp(dirName):
                     lungcoref=os.path.join(lung_bmp_dir,lungcore)
                     scipy.misc.imsave(lungcoref, dslung.pixel_array)
 
-
 def normi(img):
+     """ normalise patches 0 255"""
      tabi = np.array(img)
 #     print(tabi.min(), tabi.max())
      tabi1=tabi-tabi.min()
@@ -265,9 +261,8 @@ def pavgene (namedirtopcf):
              bmpfile = os.path.join(bmpdir,img)
              im = Image.open(bmpfile)
              imc= im.convert('RGB')
-             tabim = np.array(imc)         
+             tabf = np.array(imc)         
 #             pavgene (im,tabim,tablung,slicenumber)
-             tabf = np.copy(tabim)
         # 
              i=0
              while i <= mini:
@@ -281,10 +276,9 @@ def pavgene (namedirtopcf):
                         y=0
                         while y < dimpavy:
                            if tablung[y+j][x+i] >0:
-                               area = area+1
+                               area +=1
                            y+=1
-                        x+=1
-           
+                        x+=1           
                     #check if area above threshold
                      if area/pxy>thrpatch:
              
@@ -309,8 +303,7 @@ def pavgene (namedirtopcf):
                                         y+=1
                                     else:
                                         y+=dimpavy-1
-                                x+=1
-                    
+                                x+=1                    
                      j+=dimpavy    
                  i+=dimpavx
         #    im = plt.matshow(tabf)
@@ -349,11 +342,10 @@ def dataprocessing(patient_dir_s):
 #    dataset = np.array(dataset_list)
 #    X = dataset[:,:, :,1]
     X = np.array(dataset_list)
+    # this is already in greyscale 
 #    X = dataset[:,:, :,1]
     file_reference = np.array(file_reference_list)
-    # this is already in greyscale 
 #   
-
     #dir to put pickle files
     predictout_f_dir = os.path.join( patient_dir_s,picklefile)
     #print predictout_f_dir
@@ -366,9 +358,7 @@ def dataprocessing(patient_dir_s):
     pickle.dump(file_reference, open( xfpr, "wb" ))
 # 
 def ILDCNNpredict(patient_dir_s):     
-        print ('predict work on: ',f)
- 
-       
+        print ('predict work on: ',f)      
         
 #    print patient_dir_s
         patient_dir_pkl= os.path.join(patient_dir_s, picklefile)
@@ -381,12 +371,12 @@ def ILDCNNpredict(patient_dir_s):
         X_predict = np.asarray(np.expand_dims(X_predict,1))/float(255)
 
     # predict and store  classification and probabilities 
-        classes = model.predict_classes(X_predict, batch_size=10)
+#        classes = model.predict_classes(X_predict, batch_size=10)
         proba = model.predict_proba(X_predict, batch_size=10)
     # store  classification and probabilities 
-        xfc=os.path.join( patient_dir_pkl,predicted_classes)
+#        xfc=os.path.join( patient_dir_pkl,predicted_classes)
         xfproba=os.path.join( patient_dir_pkl,predicted_proba)
-        pickle.dump(classes, open( xfc, "wb" ))
+#        pickle.dump(classes, open( xfc, "wb" ))
         pickle.dump(proba, open( xfproba, "wb" ))
 
 def fidclass(numero):
@@ -429,7 +419,8 @@ def maxproba(proba):
     for i in interv(0,lenp-1):
         if proba[i]>m:
             m=proba[i]
-    return m
+            im=i
+    return im,m
 
     
 
@@ -437,17 +428,17 @@ def loadpkl(do):
     """crate image directory and load pkl files"""
     dop =os.path.join(do,picklefile)
     #pickle with predicted classes
-    preclasspick= os.path.join(dop,predicted_classes)
+#    preclasspick= os.path.join(dop,predicted_classes)
     #pickle with predicted probabilities
     preprobpick= os.path.join(dop,predicted_proba)
      #pickle with xfileref
     prexfilepick= os.path.join(dop,Xrefpkl)
     """generate input tables from pickles"""
-    dd = open(preclasspick,'rb')
-    my_depickler = pickle.Unpickler(dd)
-    preclass = my_depickler.load()
+#    dd = open(preclasspick,'rb')
+#    my_depickler = pickle.Unpickler(dd)
+#    preclass = my_depickler.load()
 #   
-    dd.close()
+#    dd.close()
     dd = open(preprobpick,'rb')
     my_depickler = pickle.Unpickler(dd)
     preprob = my_depickler.load()
@@ -456,7 +447,8 @@ def loadpkl(do):
     my_depickler = pickle.Unpickler(dd)
     prexfile = my_depickler.load()
     dd.close()  
-    return (preclass,preprob,prexfile)
+#    return (preclass,preprob,prexfile)
+    return (preprob,prexfile)
 
 
         
@@ -530,13 +522,15 @@ def mergcolor(tabs,tabp):
             else:
                 tabh[x][y]=tabs[x][y]
     return tabh 
+    
 def  visua(dirpatientdb):
     print('visualise work on: ',f)
     #directory name with predict out dabasase, will be created in current directory
     predictout_dir = os.path.join(dirpatientdb, predictout)
     remove_folder(predictout_dir)
     os.mkdir(predictout_dir)   
-    (preclass,preprob,listnamepatch)=loadpkl(dirpatientdb)
+    (preprob,listnamepatch)=loadpkl(dirpatientdb)
+
     dirpatientfdb=os.path.join(dirpatientdb,scanbmp)
     dirpatientfsdb=os.path.join(dirpatientdb,sroi)
     listbmpscan=os.listdir(dirpatientfdb)
@@ -564,9 +558,7 @@ def  visua(dirpatientdb):
         imscan = Image.open(imgc)
         imscanc= imscan.convert('RGB')
         tablscan = np.array(imscanc)
-#        for i in g.interv(0,25):
-#           for j in g.interv (0,511):
-#              tablscan[i][j]=0
+
     #initialise index in list of results
         ill = 0
       
@@ -586,18 +578,19 @@ def  visua(dirpatientdb):
             ypat=int(ll[deby:endy])
 
         #we found label from prediction
-            prec=int(preclass[ill])
-            classlabel=fidclass(prec)
-            classcolor=classifc[classlabel]
+#            prec=int(preclass[ill])
+         
         #we found max proba from prediction
             proba=preprob[ill]
-            mproba=round(maxproba(proba),2)
+            prec, mprobai = maxproba(proba)
+            mproba=round(mprobai,2)
+            classlabel=fidclass(prec)
 #            print(mproba)
             #print(setname, slicename,xpat,ypat,classlabel,classcolor,mproba)
-            ill+=1  
+              
             if mproba >thrproba and slicenumber == slicename:
 #                    print(setname, slicename,xpat,ypat,classlabel,classcolor,mproba)
-                    
+#                    print(mproba,preclass[ill],preprob[ill])
                     foundp=True
                     if classlabel in listlabel:
                         numl=listlabel[classlabel]
@@ -613,10 +606,7 @@ def  visua(dirpatientdb):
                     if classlabel in listlabelf:
                         nlt=listlabelf[classlabel]
                         listlabelf[classlabel]=nlt+1
-#                        cur=listlabelaverage[classlabel]
-##                               print (numl,cur)
-#                        averageproba= round((cur*numl+mproba)/(numl+1),2)
-#                        listlabelaverage[classlabel]=averageproba
+#
                     else:
                         listlabelf[classlabel]=1
 #                        listlabelaverage[classlabel]=mproba
@@ -629,7 +619,7 @@ def  visua(dirpatientdb):
                             tabsi[y+ypat][x+xpat]=prec+100
                             y+=1    
                         x+=1
-
+            ill+=1
   
         tablscanc =mergcolor(tablscan,contour(tabsi))
         imgcorefull=imgcore+'.bmp'
