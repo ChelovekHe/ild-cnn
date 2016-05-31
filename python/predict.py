@@ -86,7 +86,8 @@ thrproba = 0.9
 
 #end general part
 #font file imported in top directory
-font = ImageFont.truetype( 'arial.ttf', 20)
+# font = ImageFont.truetype( 'arial.ttf', 20)
+font = ImageFont.truetype( '../fonts/arial.ttf', 20)
 #########################################################
 errorfile = open(path_patient+'/predictlog.txt', 'w') 
 

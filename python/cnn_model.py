@@ -68,7 +68,8 @@ def get_model(input_shape, output_shape, params):
     # model.add(Convolution2D(params['k']*get_FeatureMaps(1, params['fp']), 2, 2, init='orthogonal', activation=LeakyReLU(params['a']), input_shape=input_shape[1:]))
     # added by me
     model.add(Convolution2D(params['k']*get_FeatureMaps(1, params['fp']), 2, 2, init='orthogonal', input_shape=input_shape[1:]))
-    model.add(Activation('relu'))
+    # model.add(Activation('relu'))
+    model.add(LeakyReLU(alpha=0.3))
     print 'Layer 1 parameters settings:'
     print 'number of filters to be used : ', params['k']*get_FeatureMaps(1, params['fp'])
     print 'kernel size : 2 x 2' 
@@ -78,7 +79,8 @@ def get_model(input_shape, output_shape, params):
     for i in range(2, params['cl']+1):
         # model.add(Convolution2D(params['k']*get_FeatureMaps(i, params['fp']), 2, 2, init='orthogonal', activation=LeakyReLU(params['a'])))
         model.add(Convolution2D(params['k']*get_FeatureMaps(i, params['fp']), 2, 2, init='orthogonal'))
-        model.add(Activation('relu'))
+        # model.add(Activation('relu'))
+        model.add(LeakyReLU(alpha=0.3))
         print 'Layer',  i, ' parameters settings:'
         print 'number of filters to be used : ', params['k']*get_FeatureMaps(i, params['fp'])
         print 'kernel size : 2 x 2' 
@@ -105,13 +107,15 @@ def get_model(input_shape, output_shape, params):
     model.add(Dense(int(params['k']*get_FeatureMaps(params['cl'], params['fp']))/params['pf']*6, init='he_uniform'))
     print 'output_dimension : ', int(params['k']*get_FeatureMaps(params['cl'], params['fp']))/params['pf']*6
 
-    model.add(Activation('relu'))
+    # model.add(Activation('relu'))
+    model.add(LeakyReLU(alpha=0.3))
     model.add(Dropout(params['do']))
 
     
     # model.add(Dense(int(params['k']*get_FeatureMaps(params['cl'], params['fp']))/params['pf']*2, init='he_uniform', activation=LeakyReLU(0)))
     model.add(Dense(int(params['k']*get_FeatureMaps(params['cl'], params['fp']))/params['pf']*2, init='he_uniform'))
-    model.add(Activation('relu'))
+    #  model.add(Activation('relu'))
+    model.add(LeakyReLU(alpha=0.3))
     model.add(Dropout(params['do']))
     model.add(Dense(output_shape[1], init='he_uniform', activation='softmax'))
 
@@ -203,7 +207,7 @@ def train(x_train, y_train, x_val, y_val, params):
         # check if current state of the model is the best and write evaluation metrics to file
         if fscore > maxf*params['tolerance']:  # if fscore > maxf*params['tolerance']:
             print 'fscore is still bigger than last iterations fscore + 5%'
-            # p            = 0  # restore patience counter
+            p            = 0  # restore patience counter
             best_model   = model  # store current model state
             maxf         = fscore 
             maxacc       = acc
