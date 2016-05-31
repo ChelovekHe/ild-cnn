@@ -5,10 +5,8 @@ updated: May 31, 2016
 
 ## Dataset Creation for training
 
-
      TrainingDataCreation.ipynb
 
-### Description:
 Takes the .bmp files from the patches directory and creates the dataset.
 
 Augments the data by rotating the patches 3 times by 90 degrees
@@ -27,7 +25,6 @@ X_train, X_val, X_test for the data and y_train, y_val, y_test for labels
 
       VisualCheckingPatches.ipynb
      
-### Description:
 review patches in batches of 20 or individually
 
 
@@ -35,7 +32,6 @@ review patches in batches of 20 or individually
 
        ShowPatientResults.ipynb
      
-### Description:
 The ID of a patient is chosen and then you can browse through the jpeg images with the results.
 
 
@@ -43,7 +39,6 @@ The ID of a patient is chosen and then you can browse through the jpeg images wi
 
        ResultPlotting.ipynb
      
-### Description:
 Plots various variables over training session.
 
 Currently 
@@ -57,7 +52,6 @@ Currently
 
         ConfusionMatrix.ipynb 
 
-### Description
 Plotting confusion matrix of the test set
 
 
