@@ -182,8 +182,8 @@ def train(x_train, y_train, x_val, y_val, params):
     best_model   = model
 
     # Open file to write the results
-    open(params['res_alias']+parameters_str+'.csv', 'a').write('Epoch, Val_fscore, Val_acc, Train_loss, Val_loss\n')
-    open(params['res_alias']+parameters_str+'-Best.csv', 'a').write('Epoch, Val_fscore, Val_acc, Train_loss, Val_loss\n')
+    open('../pickle/' + params['res_alias']+parameters_str+'.csv', 'a').write('Epoch, Val_fscore, Val_acc, Train_loss, Val_loss\n')
+    open('../pickle/' + params['res_alias']+parameters_str+'-Best.csv', 'a').write('Epoch, Val_fscore, Val_acc, Train_loss, Val_loss\n')
 
     print ('starting the loop of training with number of patience = ', params['patience'])
     
