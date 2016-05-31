@@ -207,7 +207,7 @@ def train(x_train, y_train, x_val, y_val, params):
         # check if current state of the model is the best and write evaluation metrics to file
         if fscore > maxf*params['tolerance']:  # if fscore > maxf*params['tolerance']:
             print 'fscore is still bigger than last iterations fscore + 5%'
-            p            = 0  # restore patience counter
+            #p            = 0  # restore patience counter
             best_model   = model  # store current model state
             maxf         = fscore 
             maxacc       = acc
@@ -228,8 +228,14 @@ def train(x_train, y_train, x_val, y_val, params):
 
 def prediction(X_test, y_test):
 
-    # faked data
-    predicted_classes = [1,3,3,0,0,0,3,0,0,0,0,0,0]
+    y_classes = model.predict_classes(X_test, batch_size=10)
 
-    return predicted_classes
+    fscore, acc, cm = H.evaluate(np.argmax(y_test, axis=1), np.argmax(y_classes, axis=1))
+    print('Test F-score: '+str(fscore)+'\ttest acc: '+str(acc))
+
+    # open('../' + 'TestLog.csv', 'a').write('Test_fscore, Test_acc')
+    open('../' + 'TestLog.csv', 'a').write(str(str(fscore)+', '+str(acc])+'\n'))
+
+
+    return
 

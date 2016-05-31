@@ -34,7 +34,7 @@ today = datetime.date.today()
 from ipdb import set_trace as bp
 
 # initialization
-args         = H.parse_args()                          # Function for parcing command-line arguments
+args         = H.parse_args()                          # Function for parsing command-line arguments
 train_params = {
      'do' : float(args.do) if args.do else 0.5,        # Dropout Parameter
      'a'  : float(args.a) if args.a else 0.3,          # Conv Layers LeakyReLU alpha param [if alpha set to 0 LeakyReLU is equivalent with ReLU]
@@ -46,7 +46,7 @@ train_params = {
      'cl' : int(args.cl) if args.cl else 5,            # Number of Convolutional Layers
      'opt': args.opt if args.opt else 'Adam',          # Optimizer: SGD, Adagrad, Adam
      'obj': args.obj if args.obj else 'ce',            # Minimization Objective: mse, ce
-     'patience' : args.pat if args.pat else 50,       # Patience parameter for early stoping
+     'patience' : args.pat if args.pat else 1,       # Patience parameter for early stoping
      'tolerance': args.tol if args.tol else 1.005,     # Tolerance parameter for early stoping [default: 1.005, checks if > 0.5%]
      'res_alias': args.csv if args.csv else 'res' + str(today)     # csv results filename alias
 }
@@ -56,8 +56,22 @@ train_params = {
 
 # train a CNN model
 model = CNN.train(X_train, y_train, X_val, y_val, train_params)
+
 # store the model and weights
 H.store_model(model)
+
+print 'training completed'
+print 'loading test set'
+
+# load test data set 
+(X_test, y_test) = H.load_testdata()
+
+# predict with test dataset and record results
+prediction = CNN.predict(X_test, y_test)
+
+print 'assessment with test set completed'
+
+
 
 
 
