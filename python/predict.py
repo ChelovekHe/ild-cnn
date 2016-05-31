@@ -16,7 +16,11 @@ import cnn_model as CNN4
 #########################################################
 # for predict
 #to enhance contrast on patch put True
-contrast=False
+contrast=True
+#threshold for patch acceptance
+thrpatch = 0.8
+#threshold for probability prediction
+thrproba = 0.995
 #global directory for predict file
 namedirtop = 'predict'
 
@@ -79,15 +83,11 @@ mini=dimtabx-dimpavx
 minj=dimtaby-dimpavy
 
 pxy=float(dimpavx*dimpavy)
-#threshold for patch acceptance
-thrpatch = 0.8
-#threshold for probability prediction
-thrproba = 0.9
+
 
 #end general part
 #font file imported in top directory
-# font = ImageFont.truetype( 'arial.ttf', 20)
-font = ImageFont.truetype( '../fonts/arial.ttf', 20)
+font = ImageFont.truetype( 'arial.ttf', 20)
 #########################################################
 errorfile = open(path_patient+'/predictlog.txt', 'w') 
 
@@ -502,6 +502,15 @@ def merg(tabs,tabp):
                 tabh[x][y]=tabs[x][y]
     return tabh 
 
+def andmerg(tabm1,tabm):
+    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
+    for y in interv(0,dimtaby-1):
+        for x in interv(0,dimtabx-1):
+            if tabm[x][y]== tabm1[x][y]:
+                tabh[x][y]=tabm[x][y]
+                
+    return tabh 
+
 def contour(tab):
      tabx=scanx(tab)
      taby=scany(tab)
@@ -537,7 +546,7 @@ def  visua(dirpatientdb):
     listbmpscan=os.listdir(dirpatientfdb)
     listlabelf={}
 #    setname=f
-    
+#    tabsim1 = np.zeros((dimtabx, dimtaby), dtype='i')
     for img in listbmpscan:
         listlabel={}
         listlabelaverage={}
@@ -564,6 +573,7 @@ def  visua(dirpatientdb):
         ill = 0
       
         foundp=False
+        
         tabsi = np.zeros((dimtabx, dimtaby), dtype='i')
         for ll in listnamepatch:
 #            print ('1',ll)
@@ -578,10 +588,8 @@ def  visua(dirpatientdb):
             endy=ll.find('.',deby)
             ypat=int(ll[deby:endy])
 
-        #we found label from prediction
-#            prec=int(preclass[ill])
          
-        #we found max proba from prediction
+        #we find max proba from prediction
             proba=preprob[ill]
             prec, mprobai = maxproba(proba)
             mproba=round(mprobai,2)
@@ -589,7 +597,7 @@ def  visua(dirpatientdb):
 #            print(mproba)
             #print(setname, slicename,xpat,ypat,classlabel,classcolor,mproba)
               
-            if mproba >thrproba and slicenumber == slicename:
+            if mproba >thrproba and slicenumber == slicename and prec !=3:
 #                    print(setname, slicename,xpat,ypat,classlabel,classcolor,mproba)
 #                    print(mproba,preclass[ill],preprob[ill])
                     foundp=True
@@ -621,13 +629,20 @@ def  visua(dirpatientdb):
                             y+=1    
                         x+=1
             ill+=1
-  
+#        tabsif=andmerg(tabsim1,tabsi) 
         tablscanc =mergcolor(tablscan,contour(tabsi))
+#        if slicenumber==14:
+#            scipy.misc.imsave('fi.bmp', tabsi) 
+#            scipy.misc.imsave('fm1.bmp', tabsim1)      
+#            scipy.misc.imsave('fif.bmp', tabsif)
+#        tabsim1=np.copy(tabsi)
         imgcorefull=imgcore+'.bmp'
         imgname=os.path.join(predictout_dir,imgcorefull)
         scipy.misc.imsave(imgname, tablscanc)
         textw='n: '+f+' scan: '+str(slicenumber)
         tagviews(imgname,textw,0,20)
+        textw='CONFIDENTIAL - prototype - not for medical use'
+        tagviews(imgname,textw,20,485)
         if foundp:
             tagviews(imgname,'average probability',0,0)           
             for ll in listlabel:
