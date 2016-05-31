@@ -27,6 +27,9 @@ be found at: https://github.com/intact-project/ild-cnn
 import ild_helpers as H
 import cnn_model as CNN
 
+import datetime
+today = datetime.date.today()
+
 # debug
 from ipdb import set_trace as bp
 
@@ -45,7 +48,7 @@ train_params = {
      'obj': args.obj if args.obj else 'ce',            # Minimization Objective: mse, ce
      'patience' : args.pat if args.pat else 50,       # Patience parameter for early stoping
      'tolerance': args.tol if args.tol else 1.005,     # Tolerance parameter for early stoping [default: 1.005, checks if > 0.5%]
-     'res_alias': args.csv if args.csv else 'res'      # csv results filename alias
+     'res_alias': args.csv if args.csv else 'res' + str(today)     # csv results filename alias
 }
 
 # loading patch data
