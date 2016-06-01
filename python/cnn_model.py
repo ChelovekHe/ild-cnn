@@ -234,7 +234,7 @@ def prediction(X_test, y_test):
     print('Test F-score: '+str(fscore)+'\ttest acc: '+str(acc))
 
     # open('../' + 'TestLog.csv', 'a').write('Test_fscore, Test_acc')
-    open('../' + 'TestLog.csv', 'a').write(str(str(fscore)+', '+str(acc])+'\n'))
+    open('../' + 'TestLog.csv', 'a').write(str(str(fscore)+', '+str(acc)+'\n'))
 
 
     return
