@@ -26,8 +26,10 @@ be found at: https://github.com/intact-project/ild-cnn
 
 import sys
 import cv2
+import cPickle as pickle
 import numpy as np
 import ild_helpers as H
+
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Flatten, Activation
 from keras.layers.convolutional import Convolution2D, MaxPooling2D,AveragePooling2D
@@ -69,7 +71,7 @@ def get_model(input_shape, output_shape, params):
     # added by me
     model.add(Convolution2D(params['k']*get_FeatureMaps(1, params['fp']), 2, 2, init='orthogonal', input_shape=input_shape[1:]))
     # model.add(Activation('relu'))
-    model.add(LeakyReLU(alpha=0.3))
+    model.add(LeakyReLU(alpha=params['a']))
     print 'Layer 1 parameters settings:'
     print 'number of filters to be used : ', params['k']*get_FeatureMaps(1, params['fp'])
     print 'kernel size : 2 x 2' 
@@ -80,7 +82,7 @@ def get_model(input_shape, output_shape, params):
         # model.add(Convolution2D(params['k']*get_FeatureMaps(i, params['fp']), 2, 2, init='orthogonal', activation=LeakyReLU(params['a'])))
         model.add(Convolution2D(params['k']*get_FeatureMaps(i, params['fp']), 2, 2, init='orthogonal'))
         # model.add(Activation('relu'))
-        model.add(LeakyReLU(alpha=0.3))
+        model.add(LeakyReLU(alpha=params['a']))
         print 'Layer',  i, ' parameters settings:'
         print 'number of filters to be used : ', params['k']*get_FeatureMaps(i, params['fp'])
         print 'kernel size : 2 x 2' 
@@ -108,14 +110,14 @@ def get_model(input_shape, output_shape, params):
     print 'output_dimension : ', int(params['k']*get_FeatureMaps(params['cl'], params['fp']))/params['pf']*6
 
     # model.add(Activation('relu'))
-    model.add(LeakyReLU(alpha=0.3))
+    model.add(LeakyReLU(alpha=params['a']))
     model.add(Dropout(params['do']))
 
     
     # model.add(Dense(int(params['k']*get_FeatureMaps(params['cl'], params['fp']))/params['pf']*2, init='he_uniform', activation=LeakyReLU(0)))
     model.add(Dense(int(params['k']*get_FeatureMaps(params['cl'], params['fp']))/params['pf']*2, init='he_uniform'))
     #  model.add(Activation('relu'))
-    model.add(LeakyReLU(alpha=0.3))
+    model.add(LeakyReLU(alpha=params['a']))
     model.add(Dropout(params['do']))
     model.add(Dense(output_shape[1], init='he_uniform', activation='softmax'))
 
@@ -226,15 +228,30 @@ def train(x_train, y_train, x_val, y_val, params):
     return best_model
 
 
-def prediction(X_test, y_test):
+def prediction(X_test, y_test, params):
 
-    y_classes = model.predict_classes(X_test, batch_size=10)
+    model = H.load_model()
+    model.compile(optimizer='Adam', loss=get_Obj(params['obj']))
 
-    fscore, acc, cm = H.evaluate(np.argmax(y_test, axis=1), np.argmax(y_classes, axis=1))
-    print('Test F-score: '+str(fscore)+'\ttest acc: '+str(acc))
+    y_classes = model.predict_classes(X_test, batch_size=250)
 
-    # open('../' + 'TestLog.csv', 'a').write('Test_fscore, Test_acc')
-    open('../' + 'TestLog.csv', 'a').write(str(str(fscore)+', '+str(acc)+'\n'))
+    y_val_subset = y_classes[:]
+    y_test_subset = y_test[:]
+
+
+    # argmax functions shows the index of the 1st occurence of the highest value in an array
+    y_actual = np.argmax(y_val_subset)
+    y_predict = np.argmax(y_test_subset)
+
+    
+    fscore, acc, cm = H.evaluate(y_test_subset, y_val_subset)
+    print 'f-score is : ', fscore
+    print 'accuray is : ', acc
+    print 'confusion matrix'
+    print cm
+    
+
+    open('../' + 'TestLog.csv', 'a').write(str(params['res_alias']) + ', ' + str(str(fscore) + ', ' + str(acc)+'\n')
 
 
     return

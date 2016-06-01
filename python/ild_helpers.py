@@ -91,10 +91,11 @@ def load_testdata():
     X_test = np.asarray(np.expand_dims(X_test,1))/float(255)
 
     # labels to categorical vectors
-    uniquelbls = np.unique(y_test)
-    nb_classes = uniquelbls.shape[0]
-    zbn = np.min(uniquelbls) # zero based numbering
-    y_test = np_utils.to_categorical(y_test - zbn, nb_classes)
+    # uniquelbls = np.unique(y_test)
+    # nb_classes = uniquelbls.shape[0]
+    # zbn = np.min(uniquelbls) # zero based numbering
+    # only used to make fscore,cm, acc calculation, single dimension required
+    # y_test = np_utils.to_categorical(y_test - zbn, nb_classes)
     
 
     return (X_test, y_test)

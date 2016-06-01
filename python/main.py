@@ -55,10 +55,10 @@ train_params = {
 (X_train, y_train), (X_val, y_val) = H.load_data()
 
 # train a CNN model
-model = CNN.train(X_train, y_train, X_val, y_val, train_params)
+# model = CNN.train(X_train, y_train, X_val, y_val, train_params)
 
 # store the model and weights
-H.store_model(model)
+# H.store_model(model)
 
 print 'training completed'
 print 'loading test set'
@@ -67,7 +67,7 @@ print 'loading test set'
 (X_test, y_test) = H.load_testdata()
 
 # predict with test dataset and record results
-prediction = CNN.predict(X_test, y_test)
+prediction = CNN.prediction(X_test, y_test, train_params)
 
 print 'assessment with test set completed'
 

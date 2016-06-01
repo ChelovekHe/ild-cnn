@@ -1,0 +1,2 @@
+Epoch, Val_fscore, Val_acc, Train_loss, Val_loss
+0, 0.416975869483, 0.62672, 1.2173266077, 0.955591781616
