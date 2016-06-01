@@ -28,7 +28,10 @@ import ild_helpers as H
 import cnn_model as CNN
 
 import datetime
-today = datetime.date.today()
+t = datetime.datetime.now()
+today = str('_'+str(t.month)+'-'+str(t.day)+'-'+str(t.year)+'_'+str(t.hour)+':'+str(t.minute))
+
+
 
 # debug
 from ipdb import set_trace as bp
@@ -46,7 +49,7 @@ train_params = {
      'cl' : int(args.cl) if args.cl else 5,            # Number of Convolutional Layers
      'opt': args.opt if args.opt else 'Adam',          # Optimizer: SGD, Adagrad, Adam
      'obj': args.obj if args.obj else 'ce',            # Minimization Objective: mse, ce
-     'patience' : args.pat if args.pat else 1,       # Patience parameter for early stoping
+     'patience' : args.pat if args.pat else 200,       # Patience parameter for early stoping
      'tolerance': args.tol if args.tol else 1.005,     # Tolerance parameter for early stoping [default: 1.005, checks if > 0.5%]
      'res_alias': args.csv if args.csv else 'res' + str(today)     # csv results filename alias
 }
@@ -55,10 +58,10 @@ train_params = {
 (X_train, y_train), (X_val, y_val) = H.load_data()
 
 # train a CNN model
-# model = CNN.train(X_train, y_train, X_val, y_val, train_params)
+model = CNN.train(X_train, y_train, X_val, y_val, train_params)
 
 # store the model and weights
-# H.store_model(model)
+H.store_model(model)
 
 print 'training completed'
 print 'loading test set'
@@ -67,7 +70,7 @@ print 'loading test set'
 (X_test, y_test) = H.load_testdata()
 
 # predict with test dataset and record results
-prediction = CNN.prediction(X_test, y_test, train_params)
+pred = CNN.prediction(X_test, y_test, train_params)
 
 print 'assessment with test set completed'
 

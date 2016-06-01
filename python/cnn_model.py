@@ -209,7 +209,7 @@ def train(x_train, y_train, x_val, y_val, params):
         # check if current state of the model is the best and write evaluation metrics to file
         if fscore > maxf*params['tolerance']:  # if fscore > maxf*params['tolerance']:
             print 'fscore is still bigger than last iterations fscore + 5%'
-            #p            = 0  # restore patience counter
+            p            = 0  # restore patience counter
             best_model   = model  # store current model state
             maxf         = fscore 
             maxacc       = acc
@@ -229,30 +229,23 @@ def train(x_train, y_train, x_val, y_val, params):
 
 
 def prediction(X_test, y_test, params):
-
     model = H.load_model()
     model.compile(optimizer='Adam', loss=get_Obj(params['obj']))
 
     y_classes = model.predict_classes(X_test, batch_size=250)
-
     y_val_subset = y_classes[:]
     y_test_subset = y_test[:]
-
 
     # argmax functions shows the index of the 1st occurence of the highest value in an array
     y_actual = np.argmax(y_val_subset)
     y_predict = np.argmax(y_test_subset)
 
-    
     fscore, acc, cm = H.evaluate(y_test_subset, y_val_subset)
+
     print 'f-score is : ', fscore
     print 'accuray is : ', acc
     print 'confusion matrix'
     print cm
-    
 
-    open('../' + 'TestLog.csv', 'a').write(str(params['res_alias']) + ', ' + str(str(fscore) + ', ' + str(acc)+'\n')
-
-
+    open('../' + 'TestLog.csv', 'a').write(str(params['res_alias']) + ', ' + str(str(fscore) + ', ' + str(acc)+'\n'))
     return
-
