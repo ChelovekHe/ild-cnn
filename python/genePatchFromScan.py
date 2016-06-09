@@ -6,10 +6,11 @@ import numpy as np
 import shutil
 import scipy.misc
 import dicom
+import PIL
 from PIL import Image, ImageFont, ImageDraw
+import cv2
     
-"""general parameters and file, directory names"""
-
+#general parameters and file, directory names
 #######################################################
 #customisation part for datataprep
 #global directory for scan file
@@ -17,7 +18,6 @@ namedirHUG = 'HUG'
 #subdir for roi in text
 #subHUG='ILD_TXT'
 subHUG='ILD_TXT'
-
 #define the name of directory for patches
 patchesdirname = 'patches'
 #define the name of directory for normalised patches
@@ -26,8 +26,15 @@ patchesNormdirname = 'patches_norm'
 imagedirname='patches_jpeg'
 #define name for image directory in patient directory 
 bmpname='bmp'
+#directory with lung mask dicom
+lungmask='lung_mask'
+#directory to put  lung mask bmp
+lungmaskbmp='bmp'
 #directory name with scan with roi
 sroi='sroi'
+#directory name with scan with roi
+bgdir='bgdir'
+bgdirw='bgdirw'
 #full path names
 cwd=os.getcwd()
 (cwdtop,tail)=os.path.split(cwd)
@@ -38,38 +45,31 @@ namedirtopc =os.path.join(path_HUG,subHUG)
 if not os.path.exists(namedirtopc):
     print('directory ',namedirtopc, ' does not exist!') 
 
-#print namedirtopc
-#create patch and jpeg directory
-patchpath=os.path.join(cwdtop,patchesdirname)
-#create patch and jpeg directory
-patchNormpath=os.path.join(cwdtop,patchesNormdirname)
-#print patchpath
-#define the name for jpeg files
-jpegpath=os.path.join(cwdtop,imagedirname)
-#print jpegpath
-
-if not os.path.isdir(patchpath):
-    os.mkdir(patchpath)   
-if not os.path.isdir(patchNormpath):
-    os.mkdir(patchNormpath)   
-if not os.path.isdir(jpegpath):
-    os.mkdir(jpegpath)   
-#patchpath = final/patches
-
 #end dataprep part
 #########################################################
 # general
 #image  patch format
 typei='bmp' #can be jpg
 #dicom file size in pixels
-dimtabx = 512
-dimtaby = 512
+#some are in 768
+listOverSize=[]
+dimtabxo = 768
+dimtabyo = 768
+#others in 512
+dimtabxn = 512
+dimtabyn = 512
 #patch size in pixels 32 * 32
-dimpavx =32
-dimpavy = 32
+dimpavxn =32
+dimpavyn = 32
+dimpavxo=48
+dimpavyo=48
 #threshold for patch acceptance
 thrpatch = 0.8
-font = ImageFont.truetype( 'arial.ttf', 20)
+font10 = ImageFont.truetype( 'arial.ttf', 10)
+font20 = ImageFont.truetype( 'arial.ttf', 20)
+labelbg='back_ground'
+locabg='anywhere'
+labelEnh=('consolidation','reticulation')
 #end general part
 #########################################################
 #log files
@@ -88,28 +88,34 @@ yellow=(255,255,0)
 cyan=(0,255,255)
 purple=(255,0,255)
 white=(255,255,255)
+darkgreen=(11,123,96)
+
+
 
 classif ={
-'consolidation':0,
-'fibrosis':1,
-'ground_glass':2,
-'healthy':3,
-'micronodules':4,
-'reticulation':5,
+'back_ground':0,
+'consolidation':1,
+'fibrosis':2,
+'ground_glass':3,
+'healthy':4,
+'micronodules':5,
+'reticulation':6,
 
-'air_trapping':6,
- 'bronchial_wall_thickening':7,
- 'bronchiectasis':8,
- 'cysts':9,
- 'early_fibrosis':10,
- 'emphysema':11,
- 'increased_attenuation':12,
- 'macronodules':13,
- 'pcp':14,
- 'peripheral_micronodules':15,
- 'tuberculosis':16}
+'air_trapping':7,
+ 'bronchial_wall_thickening':8,
+ 'bronchiectasis':9,
+ 'cysts':10,
+ 'early_fibrosis':11,
+ 'emphysema':12,
+ 'increased_attenuation':13,
+ 'macronodules':14,
+ 'pcp':15,
+ 'peripheral_micronodules':16,
+ 'tuberculosis':17
+  }
 
 classifc ={
+'back_ground':darkgreen,
 'consolidation':red,
 'fibrosis':blue,
 'ground_glass':yellow,
@@ -127,7 +133,27 @@ classifc ={
  'macronodules':white,
  'pcp':white,
  'peripheral_micronodules':white,
- 'tuberculosis':white}
+ 'tuberculosis':white
+ }
+#print namedirtopc
+#create patch and jpeg directory
+patchpath=os.path.join(cwdtop,patchesdirname)
+#create patch and jpeg directory
+patchNormpath=os.path.join(cwdtop,patchesNormdirname)
+#print patchpath
+#define the name for jpeg files
+jpegpath=os.path.join(cwdtop,imagedirname)
+#print jpegpath
+
+
+#patchpath = final/patches
+if not os.path.isdir(patchpath):
+    os.mkdir(patchpath)   
+if not os.path.isdir(patchNormpath):
+    os.mkdir(patchNormpath)   
+if not os.path.isdir(jpegpath):
+    os.mkdir(jpegpath)   
+
 
 #end log files
 def fidclass(numero):
@@ -149,23 +175,18 @@ def remove_folder(path):
          # remove if exists
          shutil.rmtree(path)
 
-def interv(borne_inf, borne_sup):
-    """Générateur parcourant la série des entiers entre borne_inf et borne_sup.
-    inclus
-    Note: borne_inf doit être inférieure à borne_sup"""
-      
-    while borne_inf <= borne_sup:
-        yield borne_inf
-        borne_inf += 1
-        
+
 def genebmp(dirName):
     """generate patches from dicom files and sroi"""
-    print ('generate  bmp files from dicom files in :',dirName)
+    print ('generate  bmp files from dicom files in :',f)
     #directory for patches
     bmp_dir = os.path.join(dirName, bmpname)
     remove_folder(bmp_dir)    
     os.mkdir(bmp_dir)
-    
+    bgdirf = os.path.join(dirName, bgdir)
+    remove_folder(bgdirf)    
+    os.mkdir(bgdirf)
+   
     #list dcm files
     fileList = os.listdir(dirName)
 
@@ -191,12 +212,45 @@ def genebmp(dirName):
             orign = Image.open(bmpfile)
             imscanc= orign.convert('RGB')
             tablscan = np.array(imscanc)
+            if np.shape(tablscan)[0]==768L:
+#                print ('size of image:',np.shape(tablscan)[0])
+                if f not in listOverSize:
+                    print ('size of image:',np.shape(tablscan)[0])
+                    listOverSize.append(f)
             scipy.misc.imsave(namescan, tablscan)
-            tagviews(namescan,textw,0,20)            
-            
-            
-
-listlabel=[]
+            tagviews(namescan,textw,0,20)   
+#            print lungmask, filename
+        
+         
+            lung_dir = os.path.join(dirName, lungmask)
+#            print lung_dir
+            lung_bmp_dir = os.path.join(lung_dir,lungmaskbmp)
+            lunglist = os.listdir(lung_dir)
+            remove_folder(lung_bmp_dir)
+#             if lungmaskbmp not in lunglist:
+            os.mkdir(lung_bmp_dir)
+#             print(lung_bmp_dir)
+            for lungfile in lunglist:
+#                print(lungfile)
+             if ".dcm" in lungfile.lower():  # check whether the file's DICOM
+                 lungDCM =os.path.join(lung_dir,lungfile)  
+                 dslung = dicom.read_file(lungDCM)
+                 endnumslice=lungfile.find('.dcm')
+                 lungcore=lungfile[0:endnumslice]+'.'+typei
+                 lungcoref=os.path.join(lung_bmp_dir,lungcore)
+                 scipy.misc.imsave(lungcoref, dslung.pixel_array)
+                 bgdirflm=os.path.join(bgdirf,lungcore)
+#                 print lungcoref,bgdirflm
+                 shutil.copyfile(lungcoref,bgdirflm)
+                 o = Image.open(bgdirflm,'r')
+                 t=np.array(o)
+#                 print bgdirflm
+                 del o
+                 np.putmask(t,t>0,100)
+                 scipy.misc.imsave(bgdirflm, t)
+#                 print 'end bmp'
+                  
+#listlabel=[]
 #print(namedirtopc)
 listdirc= (os.listdir(namedirtopc))
 #print(listcwd)
@@ -429,14 +483,15 @@ def normi(img):
 #     print(tabi1.min(), tabi1.max())
      tabi2=tabi1*(255/float(tabi1.max()-tabi1.min()))
 #     print(tabi2.min(), tabi2.max())
+    
      return tabi2
 
 
         
 def scanx(tab):
     tabh= np.zeros((dimtabx, dimtaby), dtype='i')
-    for x in interv(1,dimtabx-1):
-        for y in interv(1,dimtaby-1):
+    for x in range(1,dimtabx):
+        for y in range(1,dimtaby):
 #            print (x,y)
             if tab[x][y-1]==0 and tab[x][y]>0:
                 tabh[x][y]=tab[x][y]
@@ -455,8 +510,8 @@ def scanx(tab):
     
 def scany(tab):
     tabh= np.zeros((dimtabx, dimtaby), dtype='i')
-    for y in interv(1,dimtaby-1):
-        for x in interv(1,dimtabx-1):
+    for y in range(1,dimtaby):
+        for x in range(1,dimtabx):
             if tab[x-1][y]==0 and tab[x][y]>0:
                 tabh[x][y]=tab[x][y]
             elif tab[x-1][y]==0 and tab[x][y]==0:
@@ -475,8 +530,8 @@ def scany(tab):
     return tabh         
 def merg(tabs,tabp):
     tabh= np.zeros((dimtabx, dimtaby), dtype='i')
-    for y in interv(0,dimtaby-1):
-        for x in interv(0,dimtabx-1):
+    for y in range(0,dimtaby):
+        for x in range(0,dimtabx):
             if tabp[x][y]>0:
                 tabh[x][y]=tabp[x][y]
             else:
@@ -488,16 +543,30 @@ def contour(tab):
      taby=scany(tab)
      tabi=merg(tabx,taby)
      return tabi
+     
+def substr(tabr,tabs):
+    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
+#    print ('substr',dimtabx, dimtaby)
+    for y in range(0,dimtaby):
+        for x in range(0,dimtabx):
+            
+            if tabs[x][y]>0 and tabr[x][y] >0:
+                tabh[x][y]=0
+            else:
+                tabh[x][y]=tabr[x][y]
+    return tabh 
 
 
 def mergcolor(tabs,tabp):
     tabh= np.zeros((dimtabx, dimtaby,3), dtype='i')
     
-    for y in interv(0,dimtaby-1):
-        for x in interv(0,dimtabx-1):
+    for y in range(0,dimtaby):
+        for x in range(0,dimtabx):
             
             if tabp[x][y]>0:
+             
                 prec= tabp[x][y]-100
+#                print prec
                 classlabel=fidclass(prec)
                 classcolor=classifc[classlabel]
                 tabh[x][y]=classcolor
@@ -514,39 +583,177 @@ def tagview(fig,text,x,y):
     deltay=25*(classif[text]%3)
     deltax=175*(classif[text]//3)
     #print text, col
-    draw.text((x+deltax, y+deltay),text,col,font=font)
+    draw.text((x+deltax, y+deltay),text,col,font=font20)
     imgn.save(fig)
 
 def tagviews(fig,text,x,y):
     """write simple text in image """
     imgn=Image.open(fig)
     draw = ImageDraw.Draw(imgn)
-    draw.text((x, y),text,white,font=font)
+    draw.text((x, y),text,white,font=font10)
     imgn.save(fig)
 
-def pavs (tabc,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
+def pavbg(namedirtopcf,dx,dy,px,py):
+    print('generate back-ground for :',f)
+
+    bgdirf = os.path.join(namedirtopcf, bgdir)
+    patchpathc=os.path.join(namedirtopcf,typei)
+   
+    lbmp=os.listdir(patchpathc)
+    listbg = os.listdir(bgdirf)
+
+    pxy=float(px*py) 
+    for lm in listbg:
+        
+        nbp=0
+        tabp = np.zeros((dx, dy), dtype='i')
+#        print ('lm:',lm)
+        il1=lm.find('.bmp',0)
+        j=0
+        while lm.find('_',il1-j)==-1:
+                j+=1
+        slicenumber=lm[il1-j+1:il1]
+#        print lm, il1,j
+#        print slicenumber
+        if int(slicenumber)<10:
+            slns='000'+slicenumber+'.'+typei
+        elif int(slicenumber)<100:
+            slns='00'+slicenumber+'.'+typei
+        elif int(slicenumber)<1000:
+          slns='0'+slicenumber+'.'+typei
+        elif int(slicenumber)<10000:
+          slns=slicenumber+'.'+typei
+        nambmp=os.path.join(patchpathc,lm)
+        namebg=os.path.join(bgdirf,lm)
+#        print namebg
+#find the same name in bgdir directory
+        origbg = Image.open(namebg,'r')
+      
+        for l in lbmp:
+#          print('l de pavb',l)
+          if l.find(slns)>0 and slicenumber in listsliceok:
+              nambmp=os.path.join(patchpathc,l)
+              origbmp = Image.open(nambmp,'r')
+#              print ('nambmp:',nambmp)
+              tabf=np.array(origbg)
+#        print tabf
+#        im = plt.matshow(tabf)
+#        plt.colorbar(im,label='tabf')
+#        plt.show 
+        
+        #put all to 1 if>0
+              nz= np.count_nonzero(tabf)
+              if nz>0:
+                np.putmask(tabf,tabf>0,1)
+                atabf = np.nonzero(tabf)
+                #tab[y][x]  convention
+                xmin=atabf[1].min()
+                xmax=atabf[1].max()
+                ymin=atabf[0].min()
+                ymax=atabf[0].max()
+              else:
+                xmin=0
+                xmax=0
+                ymin=0
+                ymax=0
+    
+              tabfc = np.copy(tabf)
+              i=xmin
+              while i <= xmax:
+                        j=ymin
+                        while j<=ymax:
+    #                        if i%10==0 and j%10==0:
+    #                         print(i,j)
+                            
+                            tabpatch=tabf[j:j+py,i:i+px]
+                            area= tabpatch.sum()
+                                              
+                            if float(area)/pxy >thrpatch:
+    #                             print 'good'
+    #                            good patch
+        #                   
+                                 crorig = origbmp.crop((i, j, i+px, j+py))
+                                 #detect black pixels
+                                 #imagemax=(crorig.getextrema())
+                                 imagemax=crorig.getbbox()
+        #                          
+                                 if imagemax!=None:
+                                    nbp+=1
+                                    nampa='/'+labelbg+'/'+locabg+'/'+f+'_'+slicenumber+'_'+str(nbp)+'.'+typei 
+    #                                print nampa   
+    #                                crorig.save(patchpath+nampa)
+                                    if f in listOverSize:
+                                        ncr=crorig.resize((dimpavxn,dimpavyn),PIL.Image.ANTIALIAS)
+                                        ncr.save(patchpath+nampa)
+        #normalize patches and put in patches_norm
+                                        tabi2=normi(ncr)
+                                        scipy.misc.imsave(patchNormpath+nampa, tabi2)
+                                    else:
+                                        crorig.save(patchpath+nampa)
+        #normalize patches and put in patches_norm
+                                        tabi2=normi(crorig)
+                                        scipy.misc.imsave(patchNormpath+nampa, tabi2)
+                                
+                                    x=0
+                                    #we draw the rectange
+                                    while x < px:
+                                        y=0
+                                        while y < py:
+                                            tabp[y+j][x+i]=4
+                                            if x == 0 or x == px-1 :
+                                                y+=1
+                                            else:
+                                                y+=py-1
+                                        x+=1
+                                    #we cancel the source
+                                    tabf[j:j+py,i:i+px]=0                           
+                            j+=1
+                        i+=1
+                
+              tabpw =tabfc+tabp
+              scipy.misc.imsave(jpegpath+'/'+f+'_slice_'+slicenumber+\
+        '_'+labelbg+'_'+locabg+'.jpg', tabpw) 
+              mfl=open(jpegpath+'/'+f+'_slice_'+slicenumber+'_'+labelbg+\
+        '_'+locabg+'_1.txt',"w")
+#        mfl=open(jpegpath+'/'+f+'_'+slicenumber+'.txt',"w")
+              mfl.write('#number of patches: '+str(nbp)+'\n')
+              mfl.close()
+#def contour2(tab):  
+#        scipy.misc.imsave('tempo.jpg', tab)
+#        img = cv2.imread('tempo.jpg')
+#        imgray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+#        ret,thresh = cv2.threshold(imgray,0,255,0)
+#        im2,contours0, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,\
+#                  cv2.CHAIN_APPROX_SIMPLE)
+#        vis = np.zeros((dimtabx,dimtaby, 3), np.uint8)
+#        contours = [cv2.approxPolyDP(cnt, 0, True) for cnt in contours0]
+#        cv2.drawContours(vis,contours,-1,(0,255,),1,cv2.LINE_AA, hierarchy, 5)
+#        visg = cv2.cvtColor(vis,cv2.COLOR_BGR2GRAY)
+#        tabreturn=np.array(visg)
+#        return tabreturn
+   
+###
+    
+def pavs (tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
     iln,f,label,loca,typei,errorfile):
     """ generate patches from ROI"""
     tabh= np.zeros((dimtabx, dimtaby), dtype='i')
-    for y in interv(0,dimtaby-1):
-        for x in interv(0,dimtabx-1):
+    for y in range(0,dimtaby):
+        for x in range(0,dimtabx):
             if tab[x][y]>0:
                 tabh[x][y]=100+classif[label]
 
     newtab=contour(tabh)
-   
-    mintaby= min(511,tabc.take([1],axis=1).min())
-    maxtaby= min(511,tabc.take([1],axis=1).max())
-    mintabx= min(511,tabc.take([0],axis=1).min())
-    maxtabx= min(511,tabc.take([0],axis=1).max())
-#    print(mintabx,maxtabx,mintaby,maxtaby)
+    bgdirf = os.path.join(namedirtopcf, bgdir)
     patchpathc=os.path.join(namedirtopcf,typei)
 #    print patchpathc
     contenujpg = os.listdir(patchpathc)
-    #contenujpg in  final/ILD_DB_txtROIs/35/jpg
+    #directory with lung mask dicom
+    #contenujpg in  final/ILD_DB_txtROIs/35/bmp
     debnumslice=iln.find('_')+1
     endnumslice=iln.find('_',debnumslice)
     slicenumber=iln[debnumslice:endnumslice]
+    slin='_'+slicenumber+'.'+typei
     if int(slicenumber)<10:
         slns='000'+slicenumber+'.'+typei
     elif int(slicenumber)<100:
@@ -558,15 +765,22 @@ def pavs (tabc,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
     tabp = np.zeros((dx, dy), dtype='i')
     tabf = np.copy(tab)
     pxy=float(px*py)
-    i=max(mintabx-px,0)
+#    i=max(mintabx-px,0)
     nbp=0
     strpac=''
-    mini=min(maxtabx-px,dx-px)
-    minj=min(maxtaby-py,dy-py)
-    maxj=max(mintaby-py,0)
     errorliststring=[]
-    for  n in contenujpg:
-            
+
+    lung_dir1 = os.path.join(namedirtopcf, lungmask)
+#            print lung_dir
+    lung_bmp_dir = os.path.join(lung_dir1,lungmaskbmp)
+    lunglist = os.listdir(lung_bmp_dir)
+    atabf = np.nonzero(tabf)
+        #tab[y][x]  convention
+    xmin=atabf[1].min()
+    xmax=atabf[1].max()
+    ymin=atabf[0].min()
+    ymax=atabf[0].max()
+    for  n in contenujpg:           
         #                    print(slns)
         if n.find(slns)>0:
             namebmp=namedirtopcf+'/'+typei+'/'+n   
@@ -583,26 +797,48 @@ def pavs (tabc,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
             
 #            print namescan
             scipy.misc.imsave(namescan, tabcolor)
+#            namebg=f+slicenumber+'.jpg'
+            for lm in lunglist:
+#                print lunglist
+#                print slin
+                if lm.find(slin)>0:
+                    #look in lung maask the name of slice
+
+                    namebg=os.path.join(bgdirf,lm)
+#find the same name in bgdir directory
+                    origbg = Image.open(namebg,'r')
+                    tabhc=np.array(origbg)
+                    #otherwise not able to rewrite
+                    del origbg
+#substract the roi from lung mask,  rewite at same place to accomodate with many roi
+                    tabhc1=substr(tabhc,tabh)                    
+                    scipy.misc.imsave(namebg, tabhc1)
+
             tagview(namescan,label,175,00)
-            
-            
-            while i <= mini:
-                j=maxj
-                while j<=minj:
-        #            print(i,j)
-                    ii=0
-                    area=0
-                    while ii < px:
-                        jj=0
-                        while jj <py:
-                            if tabf[j+jj][i+ii] >0:
-                                area+=1
-                            jj+=1
-                        ii+=1
-          
-                    if float(area)/pxy >thr:
-                        #good patch
-#                   
+            if slicenumber not in listsliceok:
+                 listsliceok.append(slicenumber) 
+            i=xmin
+            while i <= xmax:
+                j=ymin
+                while j<=ymax:
+                    tabpatch=tabf[j:j+py,i:i+px]
+                    area= tabpatch.sum()  
+                    targ=float(area)/pxy
+#                    if label in labelEnh:
+#                        thr1=thr*1.05
+#                        thr2=thr*1.1
+#                        thr3=thr*1.2
+#                        thr4=thr*0.90
+#                    else:
+#                        thr1=thr
+#                        thr2=thr
+#                        thr3=thr
+#                        thr4=thr
+#                    if targ >thr or targ>thr1 or targ>thr2 or targ>thr3 or targ> thr4:
+                    if targ >thr:
+ #good patch     
+#                        print ('slicenumber',slicenumber)
+                                          
                         crorig = orig.crop((i, j, i+px, j+py))
                          #detect black pixels
                          #imagemax=(crorig.getextrema())
@@ -618,14 +854,19 @@ def pavs (tabc,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
                         else:
                             nbp+=1
                             nampa='/'+label+'/'+loca+'/'+f+'_'+iln+'_'+str(nbp)+'.'+typei 
-                            crorig.save(patchpath+nampa)
+                            if f in listOverSize:
+#                                 print'oversize for pav'                               
+                                 imgr=crorig.resize((dimpavxn,dimpavyn), PIL.Image.ANTIALIAS)
+                                 imgr.save(patchpath+nampa)
+                                 tabi2=normi(imgr)
+                                 scipy.misc.imsave(patchNormpath+nampa, tabi2)
+                            else:
+                                 crorig.save(patchpath+nampa) 
 #normalize patches and put in patches_norm
-                            tabi2=normi(crorig)
-                            scipy.misc.imsave(patchNormpath+nampa, tabi2)
-                        
-                        
-                        #                print('pavage',i,j)
-#                        if gp:   
+                                 tabi2=normi(crorig)
+                                 scipy.misc.imsave(patchNormpath+nampa, tabi2)
+                            
+                        #                print('pavage',i,j)  
                             strpac=strpac+str(i)+' '+str(j)+'\n'
                             x=0
                             #we draw the rectange
@@ -639,14 +880,10 @@ def pavs (tabc,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
                                         y+=py-1
                                 x+=1
                             #we cancel the source
-                            x=0
-                            while x < px:
-                                y=0
-                                while y < py:
-                                    tabf[y+j][x+i]=0
-                                    y+=1
-                                x+=1
-                           
+                            if label not in labelEnh:
+                                tabf[j:j+py,i:i+px]=0
+                            else:
+                                 tabf[j:j+py/2,i:i+px/2]=0                          
                     j+=1
                 i+=1
             break
@@ -669,11 +906,25 @@ def pavs (tabc,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
 ##    plt.colorbar(im,label='ff')
 #    plt.show
 #    print('fin')
+#    print listsliceok
     return nbp,tabp
 
 
 def fileext(namefile,curdir,patchpath):
-    listlabel=[]
+    listlabel=[labelbg+'_'+locabg]
+    plab=os.path.join(patchpath,labelbg)
+    ploc=os.path.join(plab,locabg) 
+    plabNorm=os.path.join(patchNormpath,labelbg)
+    plocNorm=os.path.join(plabNorm,locabg) 
+    if not os.path.exists(plab):
+        os.mkdir(plab)
+    if not os.path.exists(plabNorm):
+        os.mkdir(plabNorm)
+    if not os.path.exists(ploc):
+        os.mkdir(ploc)
+    if not os.path.exists(plocNorm):
+        os.mkdir(plocNorm)
+
     ofi = open(namefile, 'r')
     t = ofi.read()
     #print( t)
@@ -724,6 +975,7 @@ def fileext(namefile,curdir,patchpath):
                     listlabel.append(label+'_'+loca)     
                     listlabeld=os.listdir(patchpath)
                     if label not in listlabeld:
+#                            print label
                             os.mkdir(plab)
                             os.mkdir(plabNorm)
                     listlocad=os.listdir(plab)
@@ -830,25 +1082,34 @@ for f in listdirc:
     #f = 35
     print('work on:',f)
 #    mf.write(f+'\n')
+#    if f in listOverSize:
+#        print(f,' is more than 512')
+#        dimtabx=dimtabxo
+#        dimtaby=dimtabyo
+#        dimpavx=dimpavxo
+#        dimpavy=dimpavyo
+#    else:
+#        dimtabx = dimtabxn
+#        dimtaby = dimtabyn
+#        dimpavx=dimpavxn
+#        dimpavy=dimpavyn
     nbpf=0
+    listsliceok=[]
     posp=f.find('.',0)
     posu=f.find('_',0)
     namedirtopcf=namedirtopc+'/'+f
-  
-    
+      
     if os.path.isdir(namedirtopcf):    
         sroidir=os.path.join(namedirtopcf,sroi)
         remove_folder(sroidir)
         os.mkdir(sroidir)
-       
+
     remove_folder(namedirtopcf+'/patchfile')
+    os.mkdir(namedirtopcf+'/patchfile')
     #namedirtopcf = final/ILD_DB_txtROIs/35
     if posp==-1 and posu==-1:
         contenudir = os.listdir(namedirtopcf)
 #        print(contenudir)
-   
-        if  'patchfile' not in contenudir:
-            os.mkdir(namedirtopcf+'/patchfile')
         fif=False
         for fi in contenudir:
 #            print fi
@@ -857,6 +1118,18 @@ for f in listdirc:
                 contenudir = os.listdir(namedirtopcf)
                 break
         genebmp(namedirtopcf)
+        if f in listOverSize:
+            print(f,' is more than 512')
+            dimtabx=dimtabxo
+            dimtaby=dimtabyo
+            dimpavx=dimpavxo
+            dimpavy=dimpavyo
+        else:
+            dimtabx = dimtabxn
+            dimtaby = dimtabyn
+            dimpavx=dimpavxn
+            dimpavy=dimpavyn
+#        print('just after')
         for f1 in contenudir:
             
             if f1.find('.txt') >0 and (f1.find('CT')==0 or \
@@ -924,22 +1197,19 @@ for f in listdirc:
                     print('generate tables from:',l,'in:', f)
                     tabz= reptfull(tabc,dimtabx,dimtaby)
                     tabzc=tabz+tabzc
-                    if ftab:
-                        reftab=tabc
-                        ftab=False
-                    
-                    reftab=np.concatenate((reftab,tabc),axis=0)
-                    print (l,c)
+
                     print('end create tables')
                     il=l.find('.',0)
                     iln=l[0:il]
 #                    print iln
             
             print('creates patches from:',iln, 'in:', f)
-            nbp,tabz1=pavs (reftab,tabzc,dimtabx,dimtaby,dimpavx,dimpavy,namedirtopcf,\
+            nbp,tabz1=pavs (tabzc,dimtabx,dimtaby,dimpavx,dimpavy,namedirtopcf,\
                 jpegpath, patchpath,thrpatch,iln,f,label,loca,typei,errorfile)
             print('end create patches')
             nbpf=nbpf+nbp
+            #create patches for back-ground
+        pavbg(namedirtopcf,dimtabx,dimtaby,dimpavx,dimpavy)
 #    print(f,nbpf)
     ofilepw = open(jpegpath+'/nbpat_'+f+'.txt', 'w')
     ofilepw.write('number of patches: '+str(nbpf))
@@ -1026,6 +1296,7 @@ for f in categ:
         debs=f.find('_')
         sln=f[debs+1:ends]
         listlabel={}
+        
         for f1 in categ:
                 if  f1.find(sln+'_')==0 and f1.find('.txt')>0:
                     debl=f1.find('slice_')
@@ -1056,8 +1327,10 @@ for f in categ:
         ends=len(t)
         nump= t[debs+1:ends]
         mflabel.write(sln+' number of patches: '+nump+'\n')
+#        print listlabel
         for l in listlabel:
-            mflabel.write(l+' '+str(listlabel[l])+'\n')
+           if l !=labelbg+'_'+locabg:
+             mflabel.write(l+' '+str(listlabel[l])+'\n')
         mflabel.write('---------------------'+'\n')
 
 mflabel.close()
