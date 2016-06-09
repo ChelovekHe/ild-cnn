@@ -3,16 +3,31 @@
 """general parameters and file, directory names"""
 
 import os
+import cv2
+import datetime
+import time
 import dicom
 import scipy
 from scipy import misc
 import shutil
 import numpy as np
+import PIL
 from PIL import Image, ImageFont, ImageDraw
 import cPickle as pickle
 import ild_helpers as H
 import cnn_model as CNN4
-
+t = datetime.datetime.now()
+if (t.minute)<9:
+    tm='0'+str(t.minute)
+else:
+    tm=str(t.minute)
+if (t.hour)<9:
+    th='0'+str(t.hour)
+else:
+    th=str(t.hour)
+today = str('date: '+str(t.month)+'-'+str(t.day)+'-'+str(t.year)+\
+'_'+th+':'+tm)
+print today
 #########################################################
 # for predict
 #to enhance contrast on patch put True
@@ -20,7 +35,7 @@ contrast=True
 #threshold for patch acceptance
 thrpatch = 0.8
 #threshold for probability prediction
-thrproba = 0.995
+thrproba = 0.9
 #global directory for predict file
 namedirtop = 'predict'
 
@@ -62,7 +77,10 @@ path_patient = os.path.join(cwdtop,namedirtop)
 #print PathDicom
 patient_list= os.walk(path_patient).next()[1]
 #print patient_list
-
+# list label not to visualize
+excluvisu=['back_ground','healthy']
+#dataset supposed to be healthy
+datahealthy=['138']
 #end predict part
 #########################################################
 # general
@@ -75,23 +93,21 @@ dimtaby = 512
 dimpavx =32
 dimpavy = 32
 
-#px=g.dimpavx
-#py=g.dimpavy
-#dx=g.dimtabx
-#dy=g.dimtaby
 mini=dimtabx-dimpavx
 minj=dimtaby-dimpavy
 
 pxy=float(dimpavx*dimpavy)
 
-
 #end general part
 #font file imported in top directory
-font = ImageFont.truetype( 'arial.ttf', 20)
+font20 = ImageFont.truetype( 'arial.ttf', 20)
+font10 = ImageFont.truetype( 'arial.ttf', 10)
 #########################################################
 errorfile = open(path_patient+'/predictlog.txt', 'w') 
 
 #color of labels
+
+
 red=(255,0,0)
 green=(0,255,0)
 blue=(0,0,255)
@@ -99,42 +115,57 @@ yellow=(255,255,0)
 cyan=(0,255,255)
 purple=(255,0,255)
 white=(255,255,255)
+darkgreen=(11,123,96)
+
+
+
 
 classif ={
-'consolidation':0,
-'fibrosis':1,
-'ground_glass':2,
-'healthy':3,
-'micronodules':4,
-'reticulation':5}
+'back_ground':0,
+'consolidation':1,
+'fibrosis':2,
+'ground_glass':3,
+'healthy':4,
+'micronodules':5,
+'reticulation':6,
+
+'air_trapping':7,
+ 'bronchial_wall_thickening':8,
+ 'bronchiectasis':9,
+ 'cysts':10,
+ 'early_fibrosis':11,
+ 'emphysema':12,
+ 'increased_attenuation':13,
+ 'macronodules':14,
+ 'pcp':15,
+ 'peripheral_micronodules':16,
+ 'tuberculosis':17
+  }
 
 classifc ={
+'back_ground':darkgreen,
 'consolidation':red,
 'fibrosis':blue,
 'ground_glass':yellow,
 'healthy':green,
 'micronodules':cyan,
-'reticulation':purple}
+'reticulation':purple,
 
-#model and weights fr CNN
-args  = H.parse_args()                          
-train_params = {
-     'do' : float(args.do) if args.do else 0.5,        
-     'a'  : float(args.a) if args.a else 0.3,          # Conv Layers LeakyReLU alpha param [if alpha set to 0 LeakyReLU is equivalent with ReLU]
-     'k'  : int(args.k) if args.k else 4,              # Feature maps k multiplier
-     's'  : float(args.s) if args.s else 1,            # Input Image rescale factor
-     'pf' : float(args.pf) if args.pf else 1,          # Percentage of the pooling layer: [0,1]
-     'pt' : args.pt if args.pt else 'Avg',             # Pooling type: Avg, Max
-     'fp' : args.fp if args.fp else 'proportional',    # Feature maps policy: proportional, static
-     'cl' : int(args.cl) if args.cl else 5,            # Number of Convolutional Layers
-     'opt': args.opt if args.opt else 'Adam',          # Optimizer: SGD, Adagrad, Adam
-     'obj': args.obj if args.obj else 'ce',            # Minimization Objective: mse, ce
-     'patience' : args.pat if args.pat else 5,         # Patience parameter for early stoping
-     'tolerance': args.tol if args.tol else 1.005,     # Tolerance parameter for early stoping [default: 1.005, checks if > 0.5%]
-     'res_alias': args.csv if args.csv else 'res'      # csv results filename alias
-     }
-model = H.load_model()
-model.compile(optimizer='Adam', loss=CNN4.get_Obj(train_params['obj']))
+'air_trapping':white,
+ 'bronchial_wall_thickening':white,
+ 'bronchiectasis':white,
+ 'cysts':white,
+ 'early_fibrosis':white,
+ 'emphysema':white,
+ 'increased_attenuation':white,
+ 'macronodules':white,
+ 'pcp':white,
+ 'peripheral_micronodules':white,
+ 'tuberculosis':white
+ }
+
+
+
 
 def remove_folder(path):
     """to remove folder"""
@@ -143,14 +174,6 @@ def remove_folder(path):
          # remove if exists
          shutil.rmtree(path)
 
-def interv(borne_inf, borne_sup):
-    """Générateur parcourant la série des entiers entre borne_inf et borne_sup.
-    inclus
-    Note: borne_inf doit être inférieure à borne_sup"""
-      
-    while borne_inf <= borne_sup:
-        yield borne_inf
-        borne_inf += 1
    
 def genebmp(dirName):
     """generate patches from dicom files"""
@@ -176,6 +199,13 @@ def genebmp(dirName):
 #            print imgcore
             bmpfile=os.path.join(bmp_dir,imgcore)
             scipy.misc.imsave(bmpfile, ds.pixel_array)
+            if np.shape(ds.pixel_array)[0] !=dimtabx:
+                orig= Image.open(bmpfile,'r')             
+                ncr=orig.resize((dimtabx,dimtaby),PIL.Image.ANTIALIAS)
+                del orig
+                ncr.save(bmpfile)
+#            print np.shape(ds.pixel_array)
+                
 #            ds.save_as(bmpfile)
 
         #chek if lung mask present       
@@ -197,6 +227,12 @@ def genebmp(dirName):
                     lungcore=lungfile[0:endnumslice]+'.'+typei
                     lungcoref=os.path.join(lung_bmp_dir,lungcore)
                     scipy.misc.imsave(lungcoref, dslung.pixel_array)
+                    if np.shape(dslung.pixel_array)[0] !=dimtabx:
+                        orig= Image.open(lungcoref,'r')
+                        ncr=orig.resize((dimtabx,dimtaby),PIL.Image.ANTIALIAS)
+                        del orig
+                        ncr.save(lungcoref)
+                        
 
 def normi(img):
      """ normalise patches 0 255"""
@@ -252,6 +288,7 @@ def pavgene (namedirtopcf):
 #                    print(lungfile)
                     imlung = Image.open(lungfile)
                     tablung = np.array(imlung)
+                    np.putmask(tablung,tablung>0,1)
 
                     break
              if not tflung:
@@ -264,24 +301,40 @@ def pavgene (namedirtopcf):
              imc= im.convert('RGB')
              tabf = np.array(imc)         
 #             pavgene (im,tabim,tablung,slicenumber)
-        # 
-             i=0
-             while i <= mini:
-                 j=0
+           
+             nz= np.count_nonzero(tablung)
+             if nz>0:
+            
+                atabf = np.nonzero(tablung)
+                #tab[y][x]  convention
+                xmin=atabf[1].min()
+                xmax=atabf[1].max()
+                ymin=atabf[0].min()
+                ymax=atabf[0].max()
+             else:
+                xmin=0
+                xmax=0
+                ymin=0
+                ymax=0
+                
+#             atabf = np.nonzero(tablung)
+#        #tab[y][x]  convention
+#             xmin=atabf[1].min()
+#             xmax=atabf[1].max()
+#             ymin=atabf[0].min()
+#             ymax=atabf[0].max()
+             i=xmin
+             while i <= xmax:
+                 j=ymin
         #        j=maxj
-                 while j<=minj:
+                 while j<=ymax:
         #            print(i,j)
-                     area=0.0
-                     x=0
-                     while x < dimpavx:
-                        y=0
-                        while y < dimpavy:
-                           if tablung[y+j][x+i] >0:
-                               area +=1
-                           y+=1
-                        x+=1           
-                    #check if area above threshold
-                     if area/pxy>thrpatch:
+                     tabpatch=tablung[j:j+dimpavy,i:i+dimpavx]
+                     area= tabpatch.sum()  
+        
+#                    check if area above threshold
+                     targ=float(area)/pxy
+                     if targ>thrpatch:
              
                         crorig = im.crop((i, j, i+dimpavx, j+dimpavy))
                         imagemax=crorig.getbbox()
@@ -360,7 +413,25 @@ def dataprocessing(patient_dir_s):
 # 
 def ILDCNNpredict(patient_dir_s):     
         print ('predict work on: ',f)      
-        
+#model and weights fr CNN
+        args  = H.parse_args()                          
+        train_params = {
+     'do' : float(args.do) if args.do else 0.5,        
+     'a'  : float(args.a) if args.a else 0.3,          # Conv Layers LeakyReLU alpha param [if alpha set to 0 LeakyReLU is equivalent with ReLU]
+     'k'  : int(args.k) if args.k else 4,              # Feature maps k multiplier
+     's'  : float(args.s) if args.s else 1,            # Input Image rescale factor
+     'pf' : float(args.pf) if args.pf else 1,          # Percentage of the pooling layer: [0,1]
+     'pt' : args.pt if args.pt else 'Avg',             # Pooling type: Avg, Max
+     'fp' : args.fp if args.fp else 'proportional',    # Feature maps policy: proportional, static
+     'cl' : int(args.cl) if args.cl else 5,            # Number of Convolutional Layers
+     'opt': args.opt if args.opt else 'Adam',          # Optimizer: SGD, Adagrad, Adam
+     'obj': args.obj if args.obj else 'ce',            # Minimization Objective: mse, ce
+     'patience' : args.pat if args.pat else 5,         # Patience parameter for early stoping
+     'tolerance': args.tol if args.tol else 1.005,     # Tolerance parameter for early stoping [default: 1.005, checks if > 0.5%]
+     'res_alias': args.csv if args.csv else 'res'      # csv results filename alias
+         }
+        model = H.load_model()
+        model.compile(optimizer='Adam', loss=CNN4.get_Obj(train_params['obj']))        
 #    print patient_dir_s
         patient_dir_pkl= os.path.join(patient_dir_s, picklefile)
 #        print patient_dir_pkl
@@ -398,32 +469,42 @@ def tagview(fig,text,pro,x,y):
     imgn=Image.open(fig)
     draw = ImageDraw.Draw(imgn)
     col=classifc[text]
-
-    deltay=25*(classif[text]%3)
-    deltax=175*(classif[text]//3)
+    labnow=classif[text]
+#    print (labnow, text)
+    if labnow == 0:
+        x=0
+        y=0        
+        deltax=0
+        deltay=60
+    else:        
+        deltay=25*((labnow-1)%3)
+        deltax=175*((labnow-1)//3)
     #print text, col
-    draw.text((x+deltax, y+deltay),text+' '+pro,col,font=font)
+    draw.text((x+deltax, y+deltay),text+' '+pro,col,font=font20)
 
-    imgn.save(fig)
-
-def tagviews(fig,text,x,y):
+    imgn.save(fig) 
+    
+def tagviews(fig,t0,x0,y0,t1,x1,y1,t2,x2,y2,t3,x3,y3,t4,x4,y4):
     """write simple text in image """
     imgn=Image.open(fig)
     draw = ImageDraw.Draw(imgn)
-    draw.text((x, y),text,white,font=font)
+    draw.text((x0, y0),t0,white,font=font10)
+    draw.text((x1, y1),t1,white,font=font10)
+    draw.text((x2, y2),t2,white,font=font10)
+    draw.text((x3, y3),t3,white,font=font10)
+    draw.text((x4, y4),t4,white,font=font10)
     imgn.save(fig)
 
 def maxproba(proba):
     """looks for max probability in result"""
     lenp = len(proba)
     m=0
-    for i in interv(0,lenp-1):
+    for i in range(0,lenp):
         if proba[i]>m:
             m=proba[i]
             im=i
     return im,m
 
-    
 
 def loadpkl(do):
     """crate image directory and load pkl files"""
@@ -435,11 +516,7 @@ def loadpkl(do):
      #pickle with xfileref
     prexfilepick= os.path.join(dop,Xrefpkl)
     """generate input tables from pickles"""
-#    dd = open(preclasspick,'rb')
-#    my_depickler = pickle.Unpickler(dd)
-#    preclass = my_depickler.load()
-#   
-#    dd.close()
+
     dd = open(preprobpick,'rb')
     my_depickler = pickle.Unpickler(dd)
     preprob = my_depickler.load()
@@ -452,93 +529,51 @@ def loadpkl(do):
     return (preprob,prexfile)
 
 
+def addpatch(col,lab, xt,yt):
+    imgi = np.zeros((dimtabx,dimtaby,3), np.uint8)
+#    colr=[col[2],col[1],col[0]]
+#    numl=listlabel[lab]
+    tablint=[(xt,yt),(xt,yt+dimpavy),(xt+dimpavx,yt+dimpavy),(xt+dimpavx,yt)]
+    tabtxt=np.asarray(tablint)
+#    print tabtxt
+    cv2.polylines(imgi,[tabtxt],True,col)
+    cv2.fillPoly(imgi,[tabtxt],col)
+    return imgi
+
+def drawContour(imi,ll):
+    
+    vis = np.zeros((dimtabx,dimtaby,3), np.uint8)
+    for l in ll:
+#        print l
+        col=classifc[l]
+
+        masky=cv2.inRange(imi,col,col)
+        outy=cv2.bitwise_and(imi,imi,mask=masky)
+        imgray = cv2.cvtColor(outy,cv2.COLOR_BGR2GRAY)
+        ret,thresh = cv2.threshold(imgray,0,255,0)
+        im2,contours0, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,\
+        cv2.CHAIN_APPROX_SIMPLE)
+#print (len(contours))
+#cnt=contours[2]
         
-def scanx(tab):
-    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
-    for x in interv(1,dimtabx-1):
-        for y in interv(1,dimtaby-1):
-            if tab[x][y-1]==0 and tab[x][y]>0:
-                tabh[x][y]=tab[x][y]
-            elif tab[x][y-1]==0 and tab[x][y]==0:
-                tabh[x][y]=0
-            elif tab[x][y-1]>0 and tab[x][y]==0:
-              tabh[x][y-1]=tab[x][y-1]
-            elif tab[x][y-1]>0 and tab[x][y]>0:
-                if tab[x][y-1] == tab[x][y]:
-                    tabh[x][y]=0
-                else:
-                    tabh[x][y]=tab[x][y] 
-                    tabh[x][y-1]=tab[x][y-1]
+        contours = [cv2.approxPolyDP(cnt, 0, True) for cnt in contours0]
+        cv2.drawContours(vis,contours,-1,col,1,cv2.LINE_AA)
 
-    return tabh
-    
-def scany(tab):
-    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
-    for y in interv(1,dimtaby-1):
-        for x in interv(1,dimtabx-1):
-            if tab[x-1][y]==0 and tab[x][y]>0:
-                tabh[x][y]=tab[x][y]
-            elif tab[x-1][y]==0 and tab[x][y]==0:
-                tabh[x][y]=0
-            elif tab[x-1][y]>0 and tab[x][y]==0:
-              tabh[x-1][y]=tab[x-1][y]
-            elif tab[x-1][y]>0 and tab[x][y]>0:
-                if tab[x-1][y] == tab[x][y]:
-                    tabh[x][y]=0
-                else:
-                    tabh[x][y]=tab[x][y]
-                    tabh[x-1][y]=tab[x-1][y]
-    return tabh
+    return vis
+#cv2.drawContours(im,contours,-1,(0,255,0),-1)
+        
 
-
-    return tabh         
-def merg(tabs,tabp):
-    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
-    for y in interv(0,dimtaby-1):
-        for x in interv(0,dimtabx-1):
-            if tabp[x][y]>0:
-                tabh[x][y]=tabp[x][y]
-            else:
-                tabh[x][y]=tabs[x][y]
-    return tabh 
-
-def andmerg(tabm1,tabm):
-    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
-    for y in interv(0,dimtaby-1):
-        for x in interv(0,dimtabx-1):
-            if tabm[x][y]== tabm1[x][y]:
-                tabh[x][y]=tabm[x][y]
-                
-    return tabh 
-
-def contour(tab):
-     tabx=scanx(tab)
-     taby=scany(tab)
-     tabi=merg(tabx,taby)
-     return tabi
-
-
-def mergcolor(tabs,tabp):
-    tabh= np.zeros((dimtabx, dimtaby,3), dtype='i')
-    
-    for y in interv(0,dimtaby-1):
-        for x in interv(0,dimtabx-1):
-            
-            if tabp[x][y]>0:
-                prec= tabp[x][y]-100
-                classlabel=fidclass(prec)
-                classcolor=classifc[classlabel]
-                tabh[x][y]=classcolor
-            else:
-                tabh[x][y]=tabs[x][y]
-    return tabh 
-    
 def  visua(dirpatientdb):
     print('visualise work on: ',f)
+    
     #directory name with predict out dabasase, will be created in current directory
     predictout_dir = os.path.join(dirpatientdb, predictout)
-    remove_folder(predictout_dir)
-    os.mkdir(predictout_dir)   
+    predictout_dir_th = os.path.join(predictout_dir,str(thrproba))
+#    print predictout_dir_th
+    if not os.path.exists(predictout_dir) :
+         os.mkdir(predictout_dir)    
+    remove_folder(predictout_dir_th)
+    os.mkdir(predictout_dir_th)
     (preprob,listnamepatch)=loadpkl(dirpatientdb)
 
     dirpatientfdb=os.path.join(dirpatientdb,scanbmp)
@@ -548,6 +583,10 @@ def  visua(dirpatientdb):
 #    setname=f
 #    tabsim1 = np.zeros((dimtabx, dimtaby), dtype='i')
     for img in listbmpscan:
+#        print img
+        #assume less than 100 patches per slice
+        imgt = np.zeros((dimtabx,dimtaby,3), np.uint8)
+        imn = np.zeros((dimtabx,dimtaby,3), np.uint8)
         listlabel={}
         listlabelaverage={}
         if os.path.exists(dirpatientfsdb):
@@ -556,7 +595,12 @@ def  visua(dirpatientdb):
         else:
             imgc=os.path.join(dirpatientfdb,img)
 
-#        print img  
+        
+#                        orig= Image.open(lungcoref,'r')
+#                        ncr=orig.resize((dimtabx,dimtaby),PIL.Image.ANTIALIAS)
+#                        del orig
+#                        ncr.save(lungcoref)        
+#        print imgc  
         endnumslice=img.find('.'+typei)
         imgcore=img[0:endnumslice]
 #        print imgcore
@@ -568,13 +612,12 @@ def  visua(dirpatientdb):
         imscan = Image.open(imgc)
         imscanc= imscan.convert('RGB')
         tablscan = np.array(imscanc)
-
-    #initialise index in list of results
+        if imscan.size[0]>512:
+            ncr=imscanc.resize((dimtabx,dimtaby),PIL.Image.ANTIALIAS)
+            tablscan = np.array(ncr) 
         ill = 0
       
         foundp=False
-        
-        tabsi = np.zeros((dimtabx, dimtaby), dtype='i')
         for ll in listnamepatch:
 #            print ('1',ll)
             #we read patches in predict/ setnumber and found localisation    
@@ -594,10 +637,11 @@ def  visua(dirpatientdb):
             prec, mprobai = maxproba(proba)
             mproba=round(mprobai,2)
             classlabel=fidclass(prec)
-#            print(mproba)
-            #print(setname, slicename,xpat,ypat,classlabel,classcolor,mproba)
-              
-            if mproba >thrproba and slicenumber == slicename and prec !=3:
+            classcolor=classifc[classlabel]
+
+
+            if mproba >thrproba and slicenumber == slicename and\
+            (f in datahealthy or (classlabel not in excluvisu)):
 #                    print(setname, slicename,xpat,ypat,classlabel,classcolor,mproba)
 #                    print(mproba,preclass[ill],preprob[ill])
                     foundp=True
@@ -618,37 +662,37 @@ def  visua(dirpatientdb):
 #
                     else:
                         listlabelf[classlabel]=1
-#                        listlabelaverage[classlabel]=mproba
-                 
-#                        listlabel.append((classlabel,mproba))
-                    x=0
-                    while x < dimpavx:
-                        y=0
-                        while y < dimpavy:
-                            tabsi[y+ypat][x+xpat]=prec+100
-                            y+=1    
-                        x+=1
+                    imgi=addpatch(classcolor,classlabel,xpat,ypat)
+
+                    imgt=cv2.add(imgt,imgi)
+
             ill+=1
 #        tabsif=andmerg(tabsim1,tabsi) 
-        tablscanc =mergcolor(tablscan,contour(tabsi))
-#        if slicenumber==14:
-#            scipy.misc.imsave('fi.bmp', tabsi) 
-#            scipy.misc.imsave('fm1.bmp', tabsim1)      
-#            scipy.misc.imsave('fif.bmp', tabsif)
-#        tabsim1=np.copy(tabsi)
+
+        vis=drawContour(imgt,listlabel)
+#        print tablscan.shape
+        imn=cv2.add(vis,tablscan)
+        imn = cv2.cvtColor(imn, cv2.COLOR_BGR2RGB)
         imgcorefull=imgcore+'.bmp'
-        imgname=os.path.join(predictout_dir,imgcorefull)
-        scipy.misc.imsave(imgname, tablscanc)
-        textw='n: '+f+' scan: '+str(slicenumber)
-        tagviews(imgname,textw,0,20)
-        textw='CONFIDENTIAL - prototype - not for medical use'
-        tagviews(imgname,textw,20,485)
+        imgname=os.path.join(predictout_dir_th,imgcorefull)
+        cv2.imwrite(imgname,imn)
+#        scipy.misc.imsave(imgname, tablscanc)
+       
         if foundp:
-            tagviews(imgname,'average probability',0,0)           
+            t0='average probability'
+        else:
+            t0='no recognised label'
+        t1='n: '+f+' scan: '+str(slicenumber)        
+        t2='CONFIDENTIAL - prototype - not for medical use'
+        t3='threshold: '+str(thrproba)
+        t4=time.asctime()
+        tagviews(imgname,t0,0,0,t1,0,20,t2,20,485,t3,0,40,t4,0,50)
+        if foundp:
+#            tagviews(imgname,'average probability',0,0)           
             for ll in listlabel:
                 tagview(imgname,ll,str(listlabelaverage[ll]),175,00)
         else:   
-            tagviews(imgname,'no recognised label',0,0)
+#            tagviews(imgname,'no recognised label',0,0)
             errorfile.write('no recognised label in: '+str(f)+' '+str (img)+'\n' )
 #            print('no recognised label in: '+str(f)+' '+str (img) )
     errorfile.write('\n'+'number of labels in :'+str(f)+'\n' )
@@ -699,4 +743,16 @@ for f in patient_list:
         ILDCNNpredict(namedirtopcf)
         visua(namedirtopcf)
         print('completed on: ',f)
+t = datetime.datetime.now()
+if (t.minute)<9:
+    tm='0'+str(t.minute)
+else:
+    tm=str(t.minute)
+if (t.hour)<9:
+    th='0'+str(t.hour)
+else:
+    th=str(t.hour)
+today = str('date: '+str(t.month)+'-'+str(t.day)+'-'+str(t.year)+\
+'_'+th+':'+tm)
+print today
 errorfile.close() 
