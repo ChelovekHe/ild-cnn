@@ -16,18 +16,7 @@ from PIL import Image, ImageFont, ImageDraw
 import cPickle as pickle
 import ild_helpers as H
 import cnn_model as CNN4
-t = datetime.datetime.now()
-if (t.minute)<9:
-    tm='0'+str(t.minute)
-else:
-    tm=str(t.minute)
-if (t.hour)<9:
-    th='0'+str(t.hour)
-else:
-    th=str(t.hour)
-today = str('date: '+str(t.month)+'-'+str(t.day)+'-'+str(t.year)+\
-'_'+th+':'+tm)
-print today
+
 #########################################################
 # for predict
 #to enhance contrast on patch put True
@@ -729,7 +718,18 @@ def renomscan(fa):
     #            print(newff)
                 shutil.copyfile(ncff,os.path.join(fa,newff) )
                 os.remove(ncff)
+def dd(i):
+    if (i)<9:
+        o='0'+str(i)
+    else:
+        o=str(i)
+    return o
+    
+t = datetime.datetime.now()
 
+today = str('date: '+dd(t.month)+'-'+dd(t.day)+'-'+str(t.year)+\
+'_'+dd(t.hour)+':'+dd(t.minute)+':'+dd(t.second))
+print today
 for f in patient_list:
     #f = 35
     print('work on:',f)
@@ -752,7 +752,7 @@ if (t.hour)<9:
     th='0'+str(t.hour)
 else:
     th=str(t.hour)
-today = str('date: '+str(t.month)+'-'+str(t.day)+'-'+str(t.year)+\
-'_'+th+':'+tm)
+today = str('date: '+dd(t.month)+'-'+dd(t.day)+'-'+str(t.year)+\
+'_'+dd(t.hour)+':'+dd(t.minute)+':'+dd(t.second))
 print today
 errorfile.close() 
