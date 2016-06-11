@@ -9,7 +9,7 @@ import dicom
 import PIL
 from PIL import Image, ImageFont, ImageDraw
 import cv2
-    
+import matplotlib.pyplot as plt    
 #general parameters and file, directory names
 #######################################################
 #customisation part for datataprep
@@ -250,231 +250,16 @@ def genebmp(dirName):
                  scipy.misc.imsave(bgdirflm, t)
 #                 print 'end bmp'
                   
-#listlabel=[]
-#print(namedirtopc)
-listdirc= (os.listdir(namedirtopc))
-#print(listcwd)
-#print(listdirc)
 
-def repts(tabc,dx,dy):
-    """ we fill tab with summits of tabc"""
-    tab = np.zeros((dx, dy), dtype='i')
-    i=0
-    tabcs0=tabc.shape[0]
-
-    while i < tabcs0:
-         x1 =min(511,tabc[i][0])
-         y1 =min(511,tabc[i][1]) 
-#         print(x1,y1)
-         tab[y1][x1]=1
-         if i<  tabcs0-1:
-             i+=1
-             x2 =min(511,tabc[i][0]) 
-             y2 =min(511,tabc[i][1]) 
-             tab[y2][x2]=1
-         i+=1
-    return tab
-
-#tabz1 = np.zeros((10, 10), dtype='i')
-
-def repti(tabc,dx,dy):
-    """ draw line in between summits from tab"""
-    tab = np.zeros((dx, dy), dtype='i')
-    tabcs0=tabc.shape[0]
-    i=0
-    while i < tabcs0:
-  
-        x1 =min(511,tabc[i][0])
-        y1 =min(511,tabc[i][1]) 
-       # print(x1,y1)
-        if i< tabcs0-1:
-             i+=1
-             x2 =min(511,tabc[i][0]) 
-             y2 =min(511,tabc[i][1]) 
-        else:
-             i+=1
-             x2 =min(511,tabc[0][0]) 
-             y2 =min(511,tabc[0][1]) 
-       # print('1',x1,y1,x2,y2)
-        if x2-x1 != 0:
-            
-                 if x1>x2:
-                     
-                    x2,x1=x1,x2
-                    y2,y1=y1,y2
-                 xi=x1
-                 c=float(y2-y1)/float(x2-x1)
-#                 sh=False
-                 while xi < x2:
-#                     print xi, x2
-                     yi = min(511,y1 + c * (xi-x1))
-#                     if x1==117 and y1<230:
-#                         sh=True
-#                         print('c: ',c, 'xi:',xi,'x1:',x1,'y1:',y1,\
-#                         ' x2:',x2,'y2:', y2, 'yi:',yi, 'round yi:',int(round(yi)))
-                     yi = int(round(yi))
-               
-#                     print yi
-                     #print('x1:',x1, 'y1:',y1, 'x2:',x2,'y2:',y2,'xi:',xi,'yi:',yi,'c:',c)             
-                     tab[yi][int(xi)]=1
-#                     xi+=1
-                     if c!=0:
-                         xi+=min(abs(c),abs(1/c))
-#                         xi+=0.1
-#                         print('delta: ',c,min(abs(c),abs(1/c)),xi)
-                        
-                     else:
-                         xi+=1
-#                     if sh:
-#                             print(xi,x2)       
-        else:
-                if y1>y2:
-                    y2,y1=y1,y2
-                yi=y1
-                while yi < y2:
-         #           print('3',int(x1),int(yi))
-                    tab[yi][x1]=1
-                    yi+=1
-    return tab
-
-
-"""table
-  y I 0
-    I 1
-    I 2 tab[y][x]
-    I .
-      0 1 2 3 .
-    ---------
-         x """
-
-def reptf(tab,tabc,dx,dy):
-    """ fill the full area of tab"""
-    tabf = np.zeros((dx, dy), dtype='i')
-    mintaby= min(510,tabc.take([1],axis=1).min())
-    maxtaby= min(510,tabc.take([1],axis=1).max())
-    mintabx= min(510,tabc.take([0],axis=1).min())
-    maxtabx= min(510,tabc.take([0],axis=1).max())
-#    print(mintabx,maxtabx,mintaby,maxtaby)
-    x=mintabx
-
-    while x <= maxtabx:
-        y=mintaby 
-        while y<=maxtaby:
-            inst=False
-            ycu=y
-            xcu=x
-            noyh=0
-            noyl=0
-            noxl=0
-            noxr=0
-            """ look right horizon"""
-            while xcu <=maxtabx:
-#                if tab[y][xcu] >0 and tab[y][xcu-1]==0:
-                if tab[y][xcu] >0 and tab[y][xcu+1]==0:
-                    noxr = noxr+1
-                xcu+=1
-            xcu=x
-            """look left horiz"""
-            while xcu >=mintabx:
-             
-                if tab[y][xcu] >0 and tab[y][xcu-1]==0:
-                     noxl = noxl+1
-                xcu-=1
-#                if(x==9 and y==9):
-#                    print(x,y,xcu,noxl)
-          
-            ycu=y
-            """look high vertic"""
-            while ycu <=maxtaby:
-                if tab[ycu][x] >0 and tab[ycu+1][x]==0:
-                    noyh = noyh+1
-                ycu+=1
-            ycu=y
-            """look low vertic"""
-            while ycu >=mintaby:
-                if tab[ycu][x] >0 and tab[ycu-1][x]==0:
-                    noyl = noyl+1
-                ycu-=1
-           
-            if noyl ==0 or noyh ==0 or noxl==0 or noxr==0:
-               #     a=1
-               inst=False 
-            else:
-#                inst = True
-                if (noyl %2 != 0 or noyh%2 != 0 or noxl%2 != 0 or
-                noxr%2 != 0):
-                    inst=True
-            if inst :
-                if (tab[y][x]==0):
-                    tabf[y][x]=3
-            y+=1
-        x+=1
-    x=1
-    return tabf
+def reptfulle(tabc,dx,dy):
+    imgi = np.zeros((dx,dy,3), np.uint8)
+    cv2.polylines(imgi,[tabc],True,(1,1,1)) 
+    cv2.fillPoly(imgi,[tabc],(1,1,1))
+    tabzi = np.array(imgi)
+    tabz = tabzi[:, :,1]   
+    return tabz, imgi
     
-def reptfc(tab,dx,dy):
-    """ correct  the full area of tab from artefacts"""
-    tabf = np.copy(tab)
-    x=1
-    while x < dx-1:
-        y=1
-        while y<dy-1 :
-            if (( tabf[y+1][x]==0 or tabf[y][x+1]==0) and \
-            tabf[y][x]==3):
-                tabf[y][x]=0
-               
-            y+=1
-        x+=1
-    y=1
-    while y < dy-1:
-        x=1
-        while x < dx-1 :
-            if ((tabf[y][x+1]==0 or tabf[y+1][x]==0) and \
-            tabf[y][x]==3):
-                tabf[y][x]=0
-                
-            x+=1
-        y+=1
-    x=1
-    while x < dx-1:
-        y=1
-        while y<dy-1 :
-            if  tabf[y][x]>0 :
-                tabf[y][x]=1
-                
-            y+=1
-        x+=1
-    return tabf
 
-
-#tabz2=tabz1+reptf(tabz1,mon_tableauc)  
-def reptfull(tabc,dx,dy):
-    """ top function to generate ROI table filled from ROI text file"""
-    tabz=repts(tabc,dx,dy)
-#    print('plot')
-#    scipy.misc.imsave('tabz.jpg', tabz)
-#    im1 = plt.matshow(tabz)
-#    plt.colorbar(im1,label='with summit')
-#    plt.show 
-
-    tabz1=tabz+repti(tabc,dx,dy)
-#    scipy.misc.imsave('tabz1.jpg', tabz1)
-#    im2 = plt.matshow(tabz1)
-#    plt.colorbar(im2,label='with summit and in between')
-
-    tabz2=tabz1+reptf(tabz1,tabc,dx,dy)
-#    scipy.misc.imsave('tabz2.jpg', tabz2)
-#    im3 = plt.matshow(tabz2)
-#    plt.colorbar(im3,label='with full fill')
-     
-    tabz3=reptfc (tabz2,dx,dy)
-#    scipy.misc.imsave('tabz3.jpg', tabz3)
-#    im4 = plt.matshow(tabz3)
-#    plt.colorbar(im4,label='with correct fill')
-#    plt.show 
-#    print(tabz3)
-#  
-    return tabz3
 
 def normi(img):
      tabi = np.array(img)
@@ -486,93 +271,6 @@ def normi(img):
     
      return tabi2
 
-
-        
-def scanx(tab):
-    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
-    for x in range(1,dimtabx):
-        for y in range(1,dimtaby):
-#            print (x,y)
-            if tab[x][y-1]==0 and tab[x][y]>0:
-                tabh[x][y]=tab[x][y]
-            elif tab[x][y-1]==0 and tab[x][y]==0:
-                tabh[x][y]=0
-            elif tab[x][y-1]>0 and tab[x][y]==0:
-              tabh[x][y-1]=tab[x][y-1]
-            elif tab[x][y-1]>0 and tab[x][y]>0:
-                if tab[x][y-1] == tab[x][y]:
-                    tabh[x][y]=0
-                else:
-                    tabh[x][y]=tab[x][y] 
-                    tabh[x][y-1]=tab[x][y-1]
-
-    return tabh
-    
-def scany(tab):
-    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
-    for y in range(1,dimtaby):
-        for x in range(1,dimtabx):
-            if tab[x-1][y]==0 and tab[x][y]>0:
-                tabh[x][y]=tab[x][y]
-            elif tab[x-1][y]==0 and tab[x][y]==0:
-                tabh[x][y]=0
-            elif tab[x-1][y]>0 and tab[x][y]==0:
-              tabh[x-1][y]=tab[x-1][y]
-            elif tab[x-1][y]>0 and tab[x][y]>0:
-                if tab[x-1][y] == tab[x][y]:
-                    tabh[x][y]=0
-                else:
-                    tabh[x][y]=tab[x][y]
-                    tabh[x-1][y]=tab[x-1][y]
-    return tabh
-
-
-    return tabh         
-def merg(tabs,tabp):
-    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
-    for y in range(0,dimtaby):
-        for x in range(0,dimtabx):
-            if tabp[x][y]>0:
-                tabh[x][y]=tabp[x][y]
-            else:
-                tabh[x][y]=tabs[x][y]
-    return tabh 
-
-def contour(tab):
-     tabx=scanx(tab)
-     taby=scany(tab)
-     tabi=merg(tabx,taby)
-     return tabi
-     
-def substr(tabr,tabs):
-    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
-#    print ('substr',dimtabx, dimtaby)
-    for y in range(0,dimtaby):
-        for x in range(0,dimtabx):
-            
-            if tabs[x][y]>0 and tabr[x][y] >0:
-                tabh[x][y]=0
-            else:
-                tabh[x][y]=tabr[x][y]
-    return tabh 
-
-
-def mergcolor(tabs,tabp):
-    tabh= np.zeros((dimtabx, dimtaby,3), dtype='i')
-    
-    for y in range(0,dimtaby):
-        for x in range(0,dimtabx):
-            
-            if tabp[x][y]>0:
-             
-                prec= tabp[x][y]-100
-#                print prec
-                classlabel=fidclass(prec)
-                classcolor=classifc[classlabel]
-                tabh[x][y]=classcolor
-            else:
-                tabh[x][y]=tabs[x][y]
-    return tabh 
 
 def tagview(fig,text,x,y):
     """write text in image according to label and color"""
@@ -718,32 +416,27 @@ def pavbg(namedirtopcf,dx,dy,px,py):
 #        mfl=open(jpegpath+'/'+f+'_'+slicenumber+'.txt',"w")
               mfl.write('#number of patches: '+str(nbp)+'\n')
               mfl.close()
-#def contour2(tab):  
-#        scipy.misc.imsave('tempo.jpg', tab)
-#        img = cv2.imread('tempo.jpg')
-#        imgray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-#        ret,thresh = cv2.threshold(imgray,0,255,0)
-#        im2,contours0, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,\
-#                  cv2.CHAIN_APPROX_SIMPLE)
-#        vis = np.zeros((dimtabx,dimtaby, 3), np.uint8)
-#        contours = [cv2.approxPolyDP(cnt, 0, True) for cnt in contours0]
-#        cv2.drawContours(vis,contours,-1,(0,255,),1,cv2.LINE_AA, hierarchy, 5)
-#        visg = cv2.cvtColor(vis,cv2.COLOR_BGR2GRAY)
-#        tabreturn=np.array(visg)
-#        return tabreturn
+
+def contour2(im,l):  
+    col=classifc[l]
+#    print l
+    vis = np.zeros((dimtabx,dimtaby,3), np.uint8)
+    imgray = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
+    ret,thresh = cv2.threshold(imgray,0,255,0)
+    im2,contours0, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,\
+        cv2.CHAIN_APPROX_SIMPLE)
+    contours = [cv2.approxPolyDP(cnt, 0, True) for cnt in contours0]
+    cv2.drawContours(vis,contours,-1,col,1,cv2.LINE_AA)
+    return vis
    
 ###
     
-def pavs (tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
+def pavs (imgi,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
     iln,f,label,loca,typei,errorfile):
     """ generate patches from ROI"""
-    tabh= np.zeros((dimtabx, dimtaby), dtype='i')
-    for y in range(0,dimtaby):
-        for x in range(0,dimtabx):
-            if tab[x][y]>0:
-                tabh[x][y]=100+classif[label]
 
-    newtab=contour(tabh)
+    vis=contour2(imgi,label)
+    
     bgdirf = os.path.join(namedirtopcf, bgdir)
     patchpathc=os.path.join(namedirtopcf,typei)
 #    print patchpathc
@@ -764,6 +457,7 @@ def pavs (tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
           slns=slicenumber+'.'+typei
     tabp = np.zeros((dx, dy), dtype='i')
     tabf = np.copy(tab)
+    np.putmask(tabf,tabf>0,1)
     pxy=float(px*py)
 #    i=max(mintabx-px,0)
     nbp=0
@@ -792,11 +486,12 @@ def pavs (tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
             imscanc= orign.convert('RGB')
            
             tablscan = np.array(imscanc)
-            tabcolor=mergcolor(tablscan,newtab)
+            imn=cv2.add(vis,tablscan)
+#            tabcolor=mergcolor(tablscan,newtab)
 #            print('1')
-            
+            cv2.imwrite(namescan,imn)
 #            print namescan
-            scipy.misc.imsave(namescan, tabcolor)
+#            scipy.misc.imsave(namescan, tabcolor)
 #            namebg=f+slicenumber+'.jpg'
             for lm in lunglist:
 #                print lunglist
@@ -808,11 +503,38 @@ def pavs (tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
 #find the same name in bgdir directory
                     origbg = Image.open(namebg,'r')
                     tabhc=np.array(origbg)
+                    np.putmask(tabhc,tabhc>0,200)
+#                    atabf = np.nonzero(tabhc)
+#        #tab[y][x]  convention
+#                    xmin=atabf[1].min()
+#                    xmax=atabf[1].max()
+#                    ymin=atabf[0].min()
+#                    ymax=atabf[0].max()
+#                    print(origbg.getbbox())
                     #otherwise not able to rewrite
+#                    print slicenumber
                     del origbg
+                    masky=cv2.inRange(imgi,(1,1,1),(1,1,1))
+                    np.putmask(masky,masky>0,200)
+                    outy=cv2.bitwise_xor(tabhc,masky)
+                   
+                    cv2.imwrite(namebg,outy)
+#                    if slicenumber =='6':
+#                        print namebg
+#                        cv2.imshow('scan',tabhc)
+#                        cv2.waitKey(0)
+#                        cv2.imshow('mask',masky)
+#                        cv2.waitKey(0)
+#                        cv2.imshow('out',outy)
+#                        cv2.waitKey(0)
+#                        cv2.destroyAllWindows()
+#                    del origbg
 #substract the roi from lung mask,  rewite at same place to accomodate with many roi
-                    tabhc1=substr(tabhc,tabh)                    
-                    scipy.misc.imsave(namebg, tabhc1)
+#                    tabhc1=substr(tabhc,tabh)  
+#                    im = plt.matshow(tabhc1)
+#                    plt.colorbar(im,label='contour')
+#                    plt.show 
+#                    scipy.misc.imsave(namebg, tabhc1)
 
             tagview(namescan,label,175,00)
             if slicenumber not in listsliceok:
@@ -900,13 +622,6 @@ def pavs (tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
     if len(errorliststring) >0:
         for l in errorliststring:
             errorfile.write(l)
-#    im = plt.matshow(tabp)
-#    plt.colorbar(im,label='with pavage')
-##    im = plt.matshow(tabf)
-##    plt.colorbar(im,label='ff')
-#    plt.show
-#    print('fin')
-#    print listsliceok
     return nbp,tabp
 
 
@@ -1076,23 +791,12 @@ def renomscan(f):
             shutil.copyfile(ncff,os.path.join(f,newff) )
             os.remove(ncff)
 
-
+listdirc= (os.listdir(namedirtopc))
 npat=0
 for f in listdirc:
     #f = 35
     print('work on:',f)
-#    mf.write(f+'\n')
-#    if f in listOverSize:
-#        print(f,' is more than 512')
-#        dimtabx=dimtabxo
-#        dimtaby=dimtabyo
-#        dimpavx=dimpavxo
-#        dimpavy=dimpavyo
-#    else:
-#        dimtabx = dimtabxn
-#        dimtaby = dimtabyn
-#        dimpavx=dimpavxn
-#        dimpavy=dimpavyn
+
     nbpf=0
     listsliceok=[]
     posp=f.find('.',0)
@@ -1134,6 +838,7 @@ for f in listdirc:
             
             if f1.find('.txt') >0 and (f1.find('CT')==0 or \
              f1.find('Tho')==0):
+#                print f1
                 npat+=1
                 fif=True
                 fileList =f1
@@ -1170,6 +875,8 @@ for f in listdirc:
 #            print c
             ftab=True
             tabzc = np.zeros((dimtabx, dimtaby), dtype='i')
+
+            imgc = np.zeros((dimtabx,dimtaby,3), np.uint8)
             for l in listslice:
 #                print('l',l,'c:',c)
                 if l.find(c,0)==0:
@@ -1195,16 +902,17 @@ for f in listdirc:
                     
 #                print(tabc)
                     print('generate tables from:',l,'in:', f)
-                    tabz= reptfull(tabc,dimtabx,dimtaby)
+                    tabz,imgi= reptfulle(tabc,dimtabx,dimtaby)                
+                    imgc=imgc+imgi                    
                     tabzc=tabz+tabzc
-
-                    print('end create tables')
+                                
+#                    print('end create tables')
                     il=l.find('.',0)
                     iln=l[0:il]
 #                    print iln
-            
+#            print('c :',c, label,loca)
             print('creates patches from:',iln, 'in:', f)
-            nbp,tabz1=pavs (tabzc,dimtabx,dimtaby,dimpavx,dimpavy,namedirtopcf,\
+            nbp,tabz1=pavs (imgc,tabzc,dimtabx,dimtaby,dimpavx,dimpavy,namedirtopcf,\
                 jpegpath, patchpath,thrpatch,iln,f,label,loca,typei,errorfile)
             print('end create patches')
             nbpf=nbpf+nbp
