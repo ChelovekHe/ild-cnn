@@ -26,7 +26,7 @@ thrpatch = 0.8
 #threshold for probability prediction
 thrproba = 0.9
 #global directory for predict file
-namedirtop = 'predict'
+namedirtop = 'predict_essai'
 
 #directory for storing image out after prediction
 predictout='predicted_results'
@@ -719,7 +719,7 @@ def renomscan(fa):
                 shutil.copyfile(ncff,os.path.join(fa,newff) )
                 os.remove(ncff)
 def dd(i):
-    if (i)<9:
+    if (i)<10:
         o='0'+str(i)
     else:
         o=str(i)
