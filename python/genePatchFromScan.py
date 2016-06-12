@@ -267,8 +267,7 @@ def normi(img):
      tabi1=tabi-tabi.min()
 #     print(tabi1.min(), tabi1.max())
      tabi2=tabi1*(255/float(tabi1.max()-tabi1.min()))
-#     print(tabi2.min(), tabi2.max())
-    
+#     print(tabi2.min(), tabi2.max())   
      return tabi2
 
 
@@ -277,10 +276,16 @@ def tagview(fig,text,x,y):
     imgn=Image.open(fig)
     draw = ImageDraw.Draw(imgn)
     col=classifc[text]
-
-    deltay=25*(classif[text]%3)
-    deltax=175*(classif[text]//3)
-    #print text, col
+    labnow=classif[text]
+#    print (labnow, text)
+    if labnow == 0:
+        x=0
+        y=0        
+        deltax=0
+        deltay=60
+    else:        
+        deltay=25*((labnow-1)%3)
+        deltax=175*((labnow-1)//3)
     draw.text((x+deltax, y+deltay),text,col,font=font20)
     imgn.save(fig)
 
@@ -334,10 +339,6 @@ def pavbg(namedirtopcf,dx,dy,px,py):
               origbmp = Image.open(nambmp,'r')
 #              print ('nambmp:',nambmp)
               tabf=np.array(origbg)
-#        print tabf
-#        im = plt.matshow(tabf)
-#        plt.colorbar(im,label='tabf')
-#        plt.show 
         
         #put all to 1 if>0
               nz= np.count_nonzero(tabf)
@@ -487,6 +488,7 @@ def pavs (imgi,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
            
             tablscan = np.array(imscanc)
             imn=cv2.add(vis,tablscan)
+            imn = cv2.cvtColor(imn, cv2.COLOR_BGR2RGB)
 #            tabcolor=mergcolor(tablscan,newtab)
 #            print('1')
             cv2.imwrite(namescan,imn)
@@ -504,37 +506,14 @@ def pavs (imgi,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
                     origbg = Image.open(namebg,'r')
                     tabhc=np.array(origbg)
                     np.putmask(tabhc,tabhc>0,200)
-#                    atabf = np.nonzero(tabhc)
-#        #tab[y][x]  convention
-#                    xmin=atabf[1].min()
-#                    xmax=atabf[1].max()
-#                    ymin=atabf[0].min()
-#                    ymax=atabf[0].max()
-#                    print(origbg.getbbox())
-                    #otherwise not able to rewrite
+
 #                    print slicenumber
                     del origbg
                     masky=cv2.inRange(imgi,(1,1,1),(1,1,1))
                     np.putmask(masky,masky>0,200)
                     outy=cv2.bitwise_xor(tabhc,masky)
-                   
+                    
                     cv2.imwrite(namebg,outy)
-#                    if slicenumber =='6':
-#                        print namebg
-#                        cv2.imshow('scan',tabhc)
-#                        cv2.waitKey(0)
-#                        cv2.imshow('mask',masky)
-#                        cv2.waitKey(0)
-#                        cv2.imshow('out',outy)
-#                        cv2.waitKey(0)
-#                        cv2.destroyAllWindows()
-#                    del origbg
-#substract the roi from lung mask,  rewite at same place to accomodate with many roi
-#                    tabhc1=substr(tabhc,tabh)  
-#                    im = plt.matshow(tabhc1)
-#                    plt.colorbar(im,label='contour')
-#                    plt.show 
-#                    scipy.misc.imsave(namebg, tabhc1)
 
             tagview(namescan,label,175,00)
             if slicenumber not in listsliceok:
@@ -875,7 +854,6 @@ for f in listdirc:
 #            print c
             ftab=True
             tabzc = np.zeros((dimtabx, dimtaby), dtype='i')
-
             imgc = np.zeros((dimtabx,dimtaby,3), np.uint8)
             for l in listslice:
 #                print('l',l,'c:',c)
