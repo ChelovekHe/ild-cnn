@@ -26,7 +26,7 @@ thrpatch = 0.8
 #threshold for probability prediction
 thrproba = 0.9
 #global directory for predict file
-namedirtop = 'predict_essai'
+namedirtop = 'predict'
 
 #directory for storing image out after prediction
 predictout='predicted_results'
@@ -108,8 +108,8 @@ darkgreen=(11,123,96)
 
 
 
-
-classif ={
+#all the possible labels
+classifstart ={
 'back_ground':0,
 'consolidation':1,
 'fibrosis':2,
@@ -130,6 +130,40 @@ classif ={
  'peripheral_micronodules':16,
  'tuberculosis':17
   }
+
+#only label we consider, number will start at 0
+classif ={
+#'back_ground':0,
+'consolidation':1,
+'fibrosis':2,
+'ground_glass':3,
+'healthy':4,
+'micronodules':5,
+'reticulation':6,
+
+'air_trapping':7,
+ 'bronchial_wall_thickening':8,
+ 'bronchiectasis':9,
+ 'cysts':10,
+ 'early_fibrosis':11,
+ 'emphysema':12,
+ 'increased_attenuation':13,
+ 'macronodules':14,
+ 'pcp':15,
+ 'peripheral_micronodules':16,
+ 'tuberculosis':17
+  }
+
+#align label to 0 for compatibility
+minc=1000
+for f in classif:
+    if classif[f] < minc:
+        minc=classif[f]
+        
+for f in classif:
+   classif[f] =classif[f]-minc
+print classif
+
 
 classifc ={
 'back_ground':darkgreen,
@@ -453,23 +487,24 @@ def fidclass(numero):
         return 'unknown'
 
 
-def tagview(fig,text,pro,x,y):
+def tagview(fig,label,pro,x,y):
     """write text in image according to label and color"""
     imgn=Image.open(fig)
     draw = ImageDraw.Draw(imgn)
-    col=classifc[text]
-    labnow=classif[text]
+    col=classifc[label]
+    labnow=classif[label]
 #    print (labnow, text)
-    if labnow == 0:
+    if label == 'back_ground':
         x=0
         y=0        
         deltax=0
         deltay=60
     else:        
-        deltay=25*((labnow-1)%3)
-        deltax=175*((labnow-1)//3)
+        deltay=25*((labnow)%3)
+        deltax=175*((labnow)//3)
+#    print (x+deltax,y+deltay)
     #print text, col
-    draw.text((x+deltax, y+deltay),text+' '+pro,col,font=font20)
+    draw.text((x+deltax, y+deltay),label+' '+pro,col,font=font20)
 
     imgn.save(fig) 
     
@@ -743,15 +778,8 @@ for f in patient_list:
         ILDCNNpredict(namedirtopcf)
         visua(namedirtopcf)
         print('completed on: ',f)
+        
 t = datetime.datetime.now()
-if (t.minute)<9:
-    tm='0'+str(t.minute)
-else:
-    tm=str(t.minute)
-if (t.hour)<9:
-    th='0'+str(t.hour)
-else:
-    th=str(t.hour)
 today = str('date: '+dd(t.month)+'-'+dd(t.day)+'-'+str(t.year)+\
 '_'+dd(t.hour)+':'+dd(t.minute)+':'+dd(t.second))
 print today
