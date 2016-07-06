@@ -131,9 +131,9 @@ classifstart ={
  'tuberculosis':17
   }
 
-#only label we consider, number will start at 0
+#only label we consider, number will start at 0 anyway
 classif ={
-#'back_ground':0,
+'back_ground':0,
 'consolidation':1,
 'fibrosis':2,
 'ground_glass':3,
@@ -162,7 +162,7 @@ for f in classif:
         
 for f in classif:
    classif[f] =classif[f]-minc
-print classif
+#print classif
 
 
 classifc ={
@@ -492,7 +492,7 @@ def tagview(fig,label,pro,x,y):
     imgn=Image.open(fig)
     draw = ImageDraw.Draw(imgn)
     col=classifc[label]
-    labnow=classif[label]
+    labnow=classifstart[label]-1
 #    print (labnow, text)
     if label == 'back_ground':
         x=0
@@ -576,12 +576,10 @@ def drawContour(imi,ll):
         imgray = cv2.cvtColor(outy,cv2.COLOR_BGR2GRAY)
         ret,thresh = cv2.threshold(imgray,0,255,0)
         im2,contours0, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,\
-        cv2.CHAIN_APPROX_SIMPLE)
-#print (len(contours))
-#cnt=contours[2]
-        
+        cv2.CHAIN_APPROX_SIMPLE)        
         contours = [cv2.approxPolyDP(cnt, 0, True) for cnt in contours0]
-        cv2.drawContours(vis,contours,-1,col,1,cv2.LINE_AA)
+#        cv2.drawContours(vis,contours,-1,col,1,cv2.LINE_AA)
+        cv2.drawContours(vis,contours,-1,col,1)
 
     return vis
 #cv2.drawContours(im,contours,-1,(0,255,0),-1)
@@ -692,10 +690,19 @@ def  visua(dirpatientdb):
 
             ill+=1
 #        tabsif=andmerg(tabsim1,tabsi) 
-
+# calculmate contours of patches
         vis=drawContour(imgt,listlabel)
 #        print tablscan.shape
-        imn=cv2.add(vis,tablscan)
+#put to zero the contour in image in order to get full visibility of contours
+        img2gray = cv2.cvtColor(vis,cv2.COLOR_BGR2GRAY)
+        ret, mask = cv2.threshold(img2gray, 10, 255, cv2.THRESH_BINARY)
+        mask_inv = cv2.bitwise_not(mask)
+        img1_bg = cv2.bitwise_and(tablscan,tablscan,mask = mask_inv)  
+#superimpose scan and contours           
+        imn=cv2.add(img1_bg,vis)
+        
+#        imn=cv2.add(tablscan,vis)
+
         imn = cv2.cvtColor(imn, cv2.COLOR_BGR2RGB)
         imgcorefull=imgcore+'.bmp'
         imgname=os.path.join(predictout_dir_th,imgcorefull)
