@@ -19,6 +19,8 @@ import cnn_model as CNN4
 
 #########################################################
 # for predict
+# with or without bg (true if with back_ground)
+wbg=True
 #to enhance contrast on patch put True
 contrast=True
 #threshold for patch acceptance
@@ -132,37 +134,57 @@ classifstart ={
   }
 
 #only label we consider, number will start at 0 anyway
-classif ={
-'back_ground':0,
-'consolidation':1,
-'fibrosis':2,
-'ground_glass':3,
-'healthy':4,
-'micronodules':5,
-'reticulation':6,
-
-'air_trapping':7,
- 'bronchial_wall_thickening':8,
- 'bronchiectasis':9,
- 'cysts':10,
- 'early_fibrosis':11,
- 'emphysema':12,
- 'increased_attenuation':13,
- 'macronodules':14,
- 'pcp':15,
- 'peripheral_micronodules':16,
- 'tuberculosis':17
-  }
+if wbg :
+    classif ={
+    'back_ground':0,
+    'consolidation':1,
+    'fibrosis':2,
+    'ground_glass':3,
+    'healthy':4,
+    'micronodules':5,
+    'reticulation':6,    
+    'air_trapping':7,
+     'bronchial_wall_thickening':8,
+     'bronchiectasis':9,
+     'cysts':10,
+     'early_fibrosis':11,
+     'emphysema':12,
+     'increased_attenuation':13,
+     'macronodules':14,
+     'pcp':15,
+     'peripheral_micronodules':16,
+     'tuberculosis':17
+      }
+else:
+     classif ={
+    'consolidation':0,
+    'fibrosis':1,
+    'ground_glass':2,
+    'healthy':3,
+    'micronodules':4,
+    'reticulation':5, 
+    'air_trapping':6,
+     'bronchial_wall_thickening':7,
+     'bronchiectasis':8,
+     'cysts':9,
+     'early_fibrosis':10,
+     'emphysema':11,
+     'increased_attenuation':12,
+     'macronodules':13,
+     'pcp':14,
+     'peripheral_micronodules':15,
+     'tuberculosis':16
+      }
 
 #align label to 0 for compatibility
-minc=1000
-for f in classif:
-    if classif[f] < minc:
-        minc=classif[f]
-        
-for f in classif:
-   classif[f] =classif[f]-minc
-#print classif
+#minc=1000
+#for f in classif:
+#    if classif[f] < minc:
+#        minc=classif[f]
+#        
+#for f in classif:
+#   classif[f] =classif[f]-minc
+##print classif
 
 
 classifc ={
