@@ -16,22 +16,23 @@ from PIL import Image, ImageFont, ImageDraw
 import cPickle as pickle
 import ild_helpers as H
 import cnn_model as CNN4
+from keras.models import model_from_json
 
 #########################################################
 # for predict
 # with or without bg (true if with back_ground)
-wbg=True
+wbg=False
 #to enhance contrast on patch put True
 contrast=True
 #threshold for patch acceptance
-thrpatch = 0.8
+thrpatch = 0.9
 #threshold for probability prediction
-thrproba = 0.9
+thrproba = 0.6
 #global directory for predict file
 namedirtop = 'predict'
 
 #directory for storing image out after prediction
-predictout='predicted_results'
+predictout='predicted_result'
 #directory for patches from scan images
 patchpath='patch_bmp'
 
@@ -65,6 +66,7 @@ cwd=os.getcwd()
 (cwdtop,tail)=os.path.split(cwd)
 
 path_patient = os.path.join(cwdtop,namedirtop)
+picklein_file = os.path.join(cwdtop,picklefile)
 #print PathDicom
 patient_list= os.walk(path_patient).next()[1]
 #print patient_list
@@ -81,8 +83,8 @@ typei='bmp' #can be jpg
 dimtabx = 512
 dimtaby = 512
 #patch size in pixels 32 * 32
-dimpavx =32
-dimpavy = 32
+dimpavx =28
+dimpavy = 28
 
 mini=dimtabx-dimpavx
 minj=dimtaby-dimpavy
@@ -222,7 +224,7 @@ def remove_folder(path):
    
 def genebmp(dirName):
     """generate patches from dicom files"""
-    print ('generate  bmp files from dicom files in :',f)
+    print ('load dicom files in :',f)
     #directory for patches
   
     bmp_dir = os.path.join(dirName, scanbmp)
@@ -411,7 +413,7 @@ def pavgene (namedirtopcf):
         
 def dataprocessing(patient_dir_s):
     
-    print ('predict data processing work on: ',f)
+    print ('generate data for CNN on: ',f)
 
 #    print(listcwd)
     patient_dir = os.path.join(patient_dir_s,patchpath)
@@ -457,7 +459,12 @@ def dataprocessing(patient_dir_s):
     pickle.dump(file_reference, open( xfpr, "wb" ))
 # 
 def ILDCNNpredict(patient_dir_s):     
-        print ('predict work on: ',f)      
+        print ('predict patches on: ',f) 
+     
+        jsonf= os.path.join(picklein_file,'ILD_CNN_model.json')
+#        print jsonf
+        weigf= os.path.join(picklein_file,'ILD_CNN_model_weights')
+#        print weigf
 #model and weights fr CNN
         args  = H.parse_args()                          
         train_params = {
@@ -475,7 +482,11 @@ def ILDCNNpredict(patient_dir_s):
      'tolerance': args.tol if args.tol else 1.005,     # Tolerance parameter for early stoping [default: 1.005, checks if > 0.5%]
      'res_alias': args.csv if args.csv else 'res'      # csv results filename alias
          }
-        model = H.load_model()
+#        model = H.load_model()
+
+        model = model_from_json(open(jsonf).read())
+        model.load_weights(weigf)
+
         model.compile(optimizer='Adam', loss=CNN4.get_Obj(train_params['obj']))        
 #    print patient_dir_s
         patient_dir_pkl= os.path.join(patient_dir_s, picklefile)
@@ -534,6 +545,7 @@ def tagviews(fig,t0,x0,y0,t1,x1,y1,t2,x2,y2,t3,x3,y3,t4,x4,y4):
     """write simple text in image """
     imgn=Image.open(fig)
     draw = ImageDraw.Draw(imgn)
+    draw.rectangle ([x1, y1,x1+100, y1+15],outline='black',fill='black')
     draw.text((x0, y0),t0,white,font=font10)
     draw.text((x1, y1),t1,white,font=font10)
     draw.text((x2, y2),t2,white,font=font10)
@@ -608,7 +620,7 @@ def drawContour(imi,ll):
         
 
 def  visua(dirpatientdb):
-    print('visualise work on: ',f)
+    print('image generation from predict: ',f)
     
     #directory name with predict out dabasase, will be created in current directory
     predictout_dir = os.path.join(dirpatientdb, predictout)
@@ -678,6 +690,7 @@ def  visua(dirpatientdb):
          
         #we find max proba from prediction
             proba=preprob[ill]
+           
             prec, mprobai = maxproba(proba)
             mproba=round(mprobai,2)
             classlabel=fidclass(prec)
@@ -688,6 +701,9 @@ def  visua(dirpatientdb):
             (f in datahealthy or (classlabel not in excluvisu)):
 #                    print(setname, slicename,xpat,ypat,classlabel,classcolor,mproba)
 #                    print(mproba,preclass[ill],preprob[ill])
+#                    if slicenumber ==2:
+#                        print classlabel
+#                        print proba
                     foundp=True
                     if classlabel in listlabel:
                         numl=listlabel[classlabel]
@@ -750,7 +766,7 @@ def  visua(dirpatientdb):
 #            print('no recognised label in: '+str(f)+' '+str (img) )
     errorfile.write('\n'+'number of labels in :'+str(f)+'\n' )
     for classlabel in listlabelf:  
-          print('p: ',f,'label:',classlabel,': ',listlabelf[classlabel])
+          print 'patient: ',f,', label:',classlabel,': ',listlabelf[classlabel]
           string=str(classlabel)+': '+str(listlabelf[classlabel])+'\n' 
 #          print string
           errorfile.write(string )
