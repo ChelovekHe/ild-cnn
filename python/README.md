@@ -66,7 +66,7 @@ model description, compilation and evaluation
 	* a switch to define if back-ground is used or not : "wbg" (False by default)
 	* size of dicom (512x512) and patches (32x32)
 	* list of classes with their number (must start at 0) in dictionary "classif"
--main outputs:
+- main outputs:
 	* predicted probabilities in "pickle_dest" this is an np array (n tuples with probabilities ordered bu by classes number)
 	* X_file_reference.pkl: np array of file name of patches images, same order than predicted_probabilities
 	* scan in bmp format with all patches as overlay, with average probability by class in directory "predicted_result"
