@@ -52,22 +52,23 @@ model description, compilation and evaluation
 - Input: dcm database in "HUG" / <top_level dir>(default ILD_TXT)
 - output: patch database (both as per original :"patches' and normalized from 0 to 255:patches_norm) , statistics on patches: label, localization, number,...
 - New directory "sroi" within each patient directory to store scan with ROI
-## prediction for one dicom at a time
+
+## Prediction for one dicom at a time
 
 	predict_file.py
 
--generate predictidet probabilities for one dicom file
--main inputs: (all as variables at top of py file)
-	-name of dicom file in variable: "filedcm" (complete path)
-	-directory where this file is in "namedirtop" variable. note: several directories will be created in it
-	-lung mask data: in "lung_mask" directory for dicom
-	-model and weights in "pickle_source" directories
-	- a switch to define if back-ground is used or not : "wbg" (False by default)
-	- -size of dicom (512x512) and patches (32x32)
-	- -list of classes with their number (must start at 0) in dictionary "classif"
+- generate predictidet probabilities for one dicom file
+- main inputs: (all as variables at top of py file)
+	* name of dicom file in variable: "filedcm" (complete path)
+	* directory where this file is in "namedirtop" variable. note: several directories will be created in it
+	* lung mask data: in "lung_mask" directory for dicom
+	* model and weights in "pickle_source" directories
+	* a switch to define if back-ground is used or not : "wbg" (False by default)
+	* size of dicom (512x512) and patches (32x32)
+	* list of classes with their number (must start at 0) in dictionary "classif"
 -main outputs:
-	-predicted probabilities in "pickle_dest" this is an np array (n tuples with probabilities ordered bu by classes number)
-	-X_file_reference.pkl: np array of file name of patches images, same order than predicted_probabilities
-	-scan in bmp format with all patches as overlay, with average probability by class in directory "predicted_result"
-	-patches in bmp are in directory "patch_bmp"
+	* predicted probabilities in "pickle_dest" this is an np array (n tuples with probabilities ordered bu by classes number)
+	* X_file_reference.pkl: np array of file name of patches images, same order than predicted_probabilities
+	* scan in bmp format with all patches as overlay, with average probability by class in directory "predicted_result"
+	* patches in bmp are in directory "patch_bmp"
 
