@@ -249,23 +249,35 @@ def genebmp(data):
     
      
     listlung=os.listdir(lung_dir)
+#    print listlung
+    lungexist=False
     for l in listlung:
           if ".dcm" in l.lower():
              endnumslice=l.find('.dcm')    
              corelung=l[0:endnumslice]
+             lungexist=True
+             break
 #    print corelung
-    posend=endnumslice
-    while l.find('_',posend)==-1:
-        posend-=1
-    debnumslice=posend+1
-    slicenumberlung=int(l[debnumslice:endnumslice])
-#    print slicenumberlung
-    if slicenumber== slicenumberlung:
-        lungfile=os.path.join(lung_dir,l)
-        RefDslung = dicom.read_file(lungfile)
-        filebmplung=corelung+'.bmp'
-        filetwlung=os.path.join(lung_dir_bmp,filebmplung)
-        scipy.misc.imsave(filetwlung, RefDslung.pixel_array)   
+    if lungexist:
+        posend=endnumslice
+        while l.find('_',posend)==-1:
+            posend-=1
+        debnumslice=posend+1
+        slicenumberlung=int(l[debnumslice:endnumslice])
+    #    print slicenumberlung
+        if slicenumber== slicenumberlung:
+            lungfile=os.path.join(lung_dir,l)
+            RefDslung = dicom.read_file(lungfile)
+            filebmplung=corelung+'.bmp'
+            filetwlung=os.path.join(lung_dir_bmp,filebmplung)
+            scipy.misc.imsave(filetwlung, RefDslung.pixel_array)
+    else:
+            tablung = np.ones((dimtabx, dimtaby), dtype='i')
+            tablung[0:dimtaby-1, 0:dimtabx-1]=255
+            filebmplung=core+'_'+str(slicenumber)+'.bmp'
+            filetwlung=os.path.join(lung_dir_bmp,filebmplung)
+            scipy.misc.imsave(filetwlung, tablung)
+            
    
    
 def normi(img):
@@ -316,24 +328,17 @@ def pavgene (data):
             slicenumberl=int((n[debnumslice:endnumslice])) 
 #            print slicenumberl
             if slicenumberscan==slicenumberl:
-#            filescan=os.path.join(dirdbname,ld)
-##                    print filescan
-#                    break
-#            print filescan
+
                 lungfile = os.path.join(lung_dir_bmp, n)
 #                print lungfile
                 imglung=cv2.imread(lungfile,1)
-        
-            
                 img1 = cv2.imread(imagedir,1)
-            
                 img2 = cv2.medianBlur(imglung,9)
 #                cv2.imshow('image',img1)
 #                cv2.waitKey(0)
                 imgray = cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
                 ret,thresh = cv2.threshold(imgray,0,255,0)
-                            
-#            
+                                        
 #                cv2.imshow('image',img2)
 #                cv2.waitKey(0)
                 atabf = np.nonzero(thresh)
@@ -350,7 +355,6 @@ def pavgene (data):
                     xmax=20
                     ymin=0
                     ymax=20
-
             
                 x=xmin
                 nbp=0
@@ -380,7 +384,7 @@ def pavgene (data):
                      
                             if imagemax==0 or min_val==max_val:
 
-                                errortext='uniform pixel in: '+ f                           
+                                errortext='uniform pixel in: '+ data                           
 #                            print(errortext)
 #                            print (min_val, max_val,min_loc, max_loc)
 #                          
@@ -838,6 +842,8 @@ remove_folder(jpegpathdir)
 os.mkdir(jpegpathdir)
 
 lung_dir = os.path.join(path_patient, lungmask)
+if os.path.exists(lung_dir)== False:
+    os.mkdir(lung_dir)
 lung_dir_bmp=os.path.join(lung_dir, lungmaskbmp)
 remove_folder(lung_dir_bmp)    
 os.mkdir(lung_dir_bmp)
@@ -856,7 +862,7 @@ dirpatientfsdb=os.path.join(path_patient,sroi)
 
 
 print('work on:',filedcm)
-print filedcm
+#print filedcm
 #namedirtopcf = os.path.join(path_patient,f)
 doPrediction(filedcm)
 #    print namedirtopcf
