@@ -845,8 +845,8 @@ os.mkdir(lung_dir_bmp)
    
 picklein_file = os.path.join(path_patient,picklefile_source)
 predictout_f_dir = os.path.join(path_patient,picklefile_dest)
-#remove_folder(predictout_f_dir)    
-#os.mkdir(predictout_f_dir)
+remove_folder(predictout_f_dir)    
+os.mkdir(predictout_f_dir)
 
 predictout_dir = os.path.join(path_patient, predictout)   
 remove_folder(predictout_dir)
