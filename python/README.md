@@ -72,3 +72,22 @@ model description, compilation and evaluation
 	* scan in bmp format with all patches as overlay, with average probability by class in directory "predicted_result"
 	* patches in bmp are in directory "patch_bmp"
 
+## Prediction for one dicom at a time, without visualization
+
+	predict_file_s.py
+
+-same that predict_file.py, without visualization, only usefull lines
+- generate predictidet probabilities for one dicom file
+- main inputs: (all as variables at top of py file)
+	* name of dicom file in variable: "filedcm" (complete path)
+	* directory where this file is in "namedirtop" variable. note: several directories will be created in it
+	* lung mask data: in "lung_mask" directory for dicom
+	* model and weights in "pickle_source" directories
+	* a switch to define if back-ground is used or not : "wbg" (False by default)
+	* size of dicom (512x512) and patches (32x32)
+	* list of classes with their number (must start at 0) in dictionary "classif"
+- main outputs:
+	* predicted probabilities in "pickle_dest" this is an np array (n tuples with probabilities ordered bu by classes number)
+	* X_file_reference.pkl: np array of file name of patches images, same order than predicted_probabilities
+	* patches in bmp are in directory "patch_bmp"
+
