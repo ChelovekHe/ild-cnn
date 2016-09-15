@@ -216,7 +216,6 @@ def pavgene (data):
     print('generate patches on: ',data)
 #    print data
     patch_list=[]
-
     endnumslice=data.find('.dcm')
     posend=endnumslice
     while data.find('-',posend)==-1:
@@ -306,6 +305,7 @@ def pavgene (data):
                                 na=np.array(imgray)
                                 normpatch=normi(na)  
                                 patch_list.append((slicenumberl,x,y,normpatch))
+                                
                             
                         #                print('pavage',i,j)  
                                 i=0
@@ -332,10 +332,10 @@ def pavgene (data):
     return patch_list
 
 # 
-def ILDCNNpredict(patch_list)   :  
+def ILDCNNpredict(patch_list) :  
+        '''actual predict'''
         dataset_list=[]
         for fil in patch_list:
-
             dataset_list.append(fil[3])
 
         X = np.array(dataset_list)
@@ -370,7 +370,7 @@ def ILDCNNpredict(patch_list)   :
         model.compile(optimizer='Adam', loss=CNN4.get_Obj(train_params['obj']))        
 
         proba = model.predict_proba(X_predict, batch_size=100)
-
+#        print proba[0]
         return proba
 
 
