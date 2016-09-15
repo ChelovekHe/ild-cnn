@@ -1,5 +1,5 @@
 # coding: utf-8
-#Sylvain Kritter 24 mai 2016
+#Sylvain Kritter 15 Sept 2016
 """general parameters and file, directory names"""
 
 import os
@@ -8,26 +8,22 @@ import datetime
 import time
 import dicom
 import scipy
-from scipy import misc
 import shutil
 import numpy as np
 import PIL
 from PIL import Image, ImageFont, ImageDraw
-import cPickle as pickle
 import ild_helpers as H
 import cnn_model as CNN4
 from keras.models import model_from_json
-import numpy
+#import numpy
 
 #########################################################
 # for predict
 # with or without bg (true if with back_ground)
 wbg=False
-#to enhance contrast on patch put True
-contrast=True
+
 #threshold for patch acceptance
 thr = 0.9
-#threshold for probability prediction
 
 #global directory for predict file
 filedcm = '../predict_file/CT-2321-0011.dcm'
@@ -35,53 +31,33 @@ namedirtop='predict_file'
 
 #directory for storing image out after prediction
 predictout='predicted_results'
-#directory for patches from scan images
-patchpath='patch_bmp'
 
 #subdirectory name to put images
 jpegpath = 'patch_jpeg'
 
 #directory with lung mask dicom
 lungmask='lung_mask'
+
 #directory to put  lung mask bmp
 lungmaskbmp='bmp'
-#directory name with scan with roi
+
+#directory name with scan with roi if exists
 sroi='sroi'
+
 #directory with bmp from dicom
 scanbmp='scan_bmp'
-#directory for bmp from dicom
-#bmpname='bmp'
 
-#pickle with predicted classes
-#predicted_classes = 'predicted_classes.pkl'
-
-#pickle with predicted probabilities
-predicted_proba= 'predicted_probabilities.pkl'
-#pickle with Xfile
-Xprepkl='X_predict.pkl'
-Xrefpkl='X_file_reference.pkl'
-
-#subdirectory name to colect pkl files resulting from prediction
-picklefile_dest='pickle_dest'
 #subdirectory name to colect weights
 picklefile_source='pickle_source'
 
-
-
-#print PathDicom
-#patient_list= os.listdir(path_patient)
-#print patient_list
 # list label not to visualize
 #excluvisu=['back_ground','healthy']
 excluvisu=[]
 
-#dataset supposed to be healthy
-#datahealthy=['138']
 #end predict part
 #########################################################
 # general
-#image  patch format
-#typei='bmp' #can be jpg
+
 #dicom file size in pixels
 dimtabx = 512
 dimtaby = 512
@@ -97,10 +73,8 @@ font20 = ImageFont.truetype( 'arial.ttf', 20)
 font10 = ImageFont.truetype( 'arial.ttf', 10)
 #print path_patient
 #########################################################
-#errorfile = open(cwdtop+'/predictlog.txt', 'w') 
 
 #color of labels
-
 
 red=(255,0,0)
 green=(0,255,0)
@@ -111,32 +85,7 @@ purple=(255,0,255)
 white=(255,255,255)
 darkgreen=(11,123,96)
 
-
-
-#all the possible labels
-classifstart ={
-'back_ground':0,
-'consolidation':1,
-'fibrosis':2,
-'ground_glass':3,
-'healthy':4,
-'micronodules':5,
-'reticulation':6,
-
-'air_trapping':7,
- 'bronchial_wall_thickening':8,
- 'bronchiectasis':9,
- 'cysts':10,
- 'early_fibrosis':11,
- 'emphysema':12,
- 'increased_attenuation':13,
- 'macronodules':14,
- 'pcp':15,
- 'peripheral_micronodules':16,
- 'tuberculosis':17
-  }
-
-#only label we consider, number will start at 0 anyway
+# label we consider, number will start at 0 anyway
 if wbg :
     classif ={
     'back_ground':0,
@@ -179,16 +128,6 @@ else:
      'tuberculosis':16
       }
 
-#align label to 0 for compatibility
-#minc=1000
-#for f in classif:
-#    if classif[f] < minc:
-#        minc=classif[f]
-#        
-#for f in classif:
-#   classif[f] =classif[f]-minc
-##print classif
-
 
 classifc ={
 'back_ground':darkgreen,
@@ -213,25 +152,20 @@ classifc ={
  }
 
 
-
-
 def remove_folder(path):
     """to remove folder"""
     # check if folder exists
     if os.path.exists(path):
          # remove if exists
          shutil.rmtree(path)
-
    
 def genebmp(data):
     """generate patches from dicom files"""
     print ('load dicom files in :',data)
 
     RefDs = dicom.read_file(data) 
-    (top,tail)=os.path.split(data)
-   
-    endnumslice=tail.find('.dcm')
-     
+    (top,tail)=os.path.split(data)   
+    endnumslice=tail.find('.dcm')    
     core=tail[0:endnumslice]
 #    print core
     posend=endnumslice
@@ -247,7 +181,6 @@ def genebmp(data):
     
 #generate bmp for lung    
     
-     
     listlung=os.listdir(lung_dir)
 #    print listlung
     lungexist=False
@@ -296,6 +229,7 @@ def pavgene (data):
     """ generate patches from scan"""
     print('generate patches on: ',data)
 #    print data
+    patch_list=[]
 
     endnumslice=data.find('.dcm')
     posend=endnumslice
@@ -307,7 +241,7 @@ def pavgene (data):
 #    print slicenumberscan    
     (top,tail)=os.path.split(data)
    
-#    print tail
+#    print 'tail' ,tail
     endnumslice=tail.find('.dcm')    
     core=tail[0:endnumslice]
     corefull=core+'.bmp'
@@ -365,7 +299,6 @@ def pavgene (data):
 #              
         # convention img[y: y + h, x: x + w]
 #                  
-
 #                    cv2.imshow('image',crop_img)
 #                    cv2.waitKey(0)
                         area= crop_img.sum()
@@ -380,27 +313,16 @@ def pavgene (data):
                             imagemax= cv2.countNonZero(imgray)
                             min_val, max_val, min_loc,max_loc = cv2.minMaxLoc(imgray)
 #                        print imagemax
-
-                     
-                            if imagemax==0 or min_val==max_val:
-
-                                errortext='uniform pixel in: '+ data                           
-#                            print(errortext)
-#                            print (min_val, max_val,min_loc, max_loc)
-#                          
-                            else:
+                    
+                            if imagemax>0 and min_val!=max_val:
                                 nbp+=1
-                                nampa='p_'+str(slicenumberscan)+'_'+str(x)+'_'+str(y)+'.bmp'                            
 #                                normpatch = cv2.equalizeHist(imgray)
                                 na=np.array(imgray)
-                                normpatch=normi(na)
-                                fw=os.path.join(patchpathdir,nampa)                               
-                                cv2.imwrite(fw,normpatch)                           
+                                normpatch=normi(na)  
+                                patch_list.append((slicenumberl,x,y,normpatch))
                             
                         #                print('pavage',i,j)  
                                 i=0
-                            #we draw the rectange
-                                
                                 while i < dimpavx:
                                     j=0
                                     while j < dimpavy:
@@ -411,15 +333,10 @@ def pavgene (data):
                                         else:
                                             j+=dimpavy-1
                                     i+=1
-                            #we cancel the source
-                            
+                            #we cancel the source                            
                                 thresh[y:y+dimpavy, x:x+dimpavx]=0
-                            
-                                y+=dimpavy-1
-                           
-#                            cv2.imshow('image',imglung+tabp)
-#                            cv2.waitKey(0)
-                                                  
+                                
+                                y+=dimpavy-1                                                  
                         y+=1
                     x+=1
             
@@ -427,50 +344,18 @@ def pavgene (data):
 
             scipy.misc.imsave(jpegpathdir+'/s_'+str(slicenumberscan)+'.jpg', tabp)
             break
+    return patch_list
 
-
-
-def dataprocessing(data):
-    
-    print ('generate data for CNN on: ',data)
-
-    # list for the merged pixel data
-    dataset_list = []
-    # list of the file reference data
-    file_reference_list = []
-    image_files = (os.listdir(patchpathdir))
-    # go through all image files
-    # 
-    for fil in image_files:
-#        print fil
-        if fil.find('.bmp') > 0:  
-#            print fil             
-            # load the .bmp file into memory       
-            image = misc.imread(os.path.join(str(patchpathdir),fil), flatten= 0)        
-            # append the array to the dataset list
-            dataset_list.append(image)      
-            # append the file name to the reference list. The objective here is to ensure that the data 
-            # and the file information about the x/y position is guamarteed        
-            file_reference_list.append(fil)
-                
-    # transform dataset list into numpy array                   
-#    dataset = np.array(dataset_list)
-#    X = dataset[:,:, :,1]
-    X = np.array(dataset_list)
-    # this is already in greyscale 
-#    X = dataset[:,:, :,1]
-    file_reference = np.array(file_reference_list)
-#   
-    #dir to put pickle files
-
-    xfp=os.path.join(predictout_f_dir,Xprepkl)
-    xfpr=os.path.join(predictout_f_dir,Xrefpkl)
-    pickle.dump(X, open( xfp, "wb" ))
-    pickle.dump(file_reference, open( xfpr, "wb" ))
 # 
-def ILDCNNpredict(data):     
-        print ('predict patches on: ',data) 
-     
+def ILDCNNpredict(patch_list)   :  
+        dataset_list=[]
+        for fil in patch_list:
+
+            dataset_list.append(fil[3])
+
+        X = np.array(dataset_list)
+        X_predict = np.asarray(np.expand_dims(X,1))/float(255)        
+        
         jsonf= os.path.join(picklein_file,'ILD_CNN_model.json')
 #        print jsonf
         weigf= os.path.join(picklein_file,'ILD_CNN_model_weights')
@@ -498,23 +383,10 @@ def ILDCNNpredict(data):
         model.load_weights(weigf)
 
         model.compile(optimizer='Adam', loss=CNN4.get_Obj(train_params['obj']))        
-#
 
-        patient_pred_file =os.path.join( predictout_f_dir,Xprepkl)
-#        print patient_pred_file
-        X_predict = pickle.load( open( patient_pred_file, "rb" ) )
-#    print X_predict
-    # adding a singleton dimension and rescale to [0,1]
-        X_predict = np.asarray(np.expand_dims(X_predict,1))/float(255)
+        proba = model.predict_proba(X_predict, batch_size=100)
 
-    # predict and store  classification and probabilities 
-#        classes = model.predict_classes(X_predict, batch_size=10)
-        proba = model.predict_proba(X_predict, batch_size=10)
-    # store  classification and probabilities 
-#        xfc=os.path.join( patient_dir_pkl,predicted_classes)
-        xfproba=os.path.join( predictout_f_dir,predicted_proba)
-#        pickle.dump(classes, open( xfc, "wb" ))
-        pickle.dump(proba, open( xfproba, "wb" ))
+        return proba
 
 def fidclass(numero):
     """return class from number"""
@@ -534,7 +406,7 @@ def tagview(fig,label,pro,x,y):
     imgn=Image.open(fig)
     draw = ImageDraw.Draw(imgn)
     col=classifc[label]
-    labnow=classifstart[label]-1
+    labnow=classif[label]
 #    print (labnow, text)
     if label == 'back_ground':
         x=0
@@ -573,33 +445,8 @@ def maxproba(proba):
     return im,m
 
 
-def loadpkl(dop):
-    """crate image directory and load pkl files"""
-
-    #pickle with predicted classes
-#    preclasspick= os.path.join(dop,predicted_classes)
-    #pickle with predicted probabilities
-    preprobpick= os.path.join(dop,predicted_proba)
-     #pickle with xfileref
-    prexfilepick= os.path.join(dop,Xrefpkl)
-    """generate input tables from pickles"""
-
-    dd = open(preprobpick,'rb')
-    my_depickler = pickle.Unpickler(dd)
-    preprob = my_depickler.load()
-    dd.close()  
-    dd = open(prexfilepick,'rb')
-    my_depickler = pickle.Unpickler(dd)
-    prexfile = my_depickler.load()
-    dd.close()  
-#    return (preclass,preprob,prexfile)
-    return (preprob,prexfile)
-
-
 def addpatch(col,lab, xt,yt):
     imgi = np.zeros((dimtabx,dimtaby,3), np.uint8)
-#    colr=[col[2],col[1],col[0]]
-#    numl=listlabel[lab]
     tablint=[(xt,yt),(xt,yt+dimpavy),(xt+dimpavx,yt+dimpavy),(xt+dimpavx,yt)]
     tabtxt=np.asarray(tablint)
 #    print tabtxt
@@ -628,24 +475,18 @@ def drawContour(imi,ll):
 #cv2.drawContours(im,contours,-1,(0,255,0),-1)
         
 
-def  visua(data):
+def  visua(data,proba,patch_list):
     print('image generation from predict: ',data)
     (top,tail)=os.path.split(data)
 #    print tail
     endnumslice=tail.find('.dcm')    
     core=tail[0:endnumslice]
-    #directory name with predict out dabasase, will be created in current directory
-    
-    (preprob,listnamepatch)=loadpkl(predictout_f_dir)
     
     listbmpscan=os.listdir(bmp_dir)
     listlabelf={}
-    print listbmpscan
-#    setname=f
-#    tabsim1 = np.zeros((dimtabx, dimtaby), dtype='i')
+
     for img in listbmpscan:
-        print img
-        #assume less than 100 patches per slice
+#        print img
         imgt = np.zeros((dimtabx,dimtaby,3), np.uint8)
         imn = np.zeros((dimtabx,dimtaby,3), np.uint8)
         listlabel={}
@@ -655,12 +496,7 @@ def  visua(data):
             imgc=os.path.join(dirpatientfsdb,img)
         else:
             imgc=os.path.join(bmp_dir,img)
-
-        
-#                        orig= Image.open(lungcoref,'r')
-#                        ncr=orig.resize((dimtabx,dimtaby),PIL.Image.ANTIALIAS)
-#                        del orig
-#                        ncr.save(lungcoref)        
+       
 #        print imgc  
         endnumslice=img.find('.bmp')
         imgcore=img[0:endnumslice]
@@ -676,38 +512,26 @@ def  visua(data):
         if imscan.size[0]>512:
             ncr=imscanc.resize((dimtabx,dimtaby),PIL.Image.ANTIALIAS)
             tablscan = np.array(ncr) 
-        ill = 0
-      
+            
+        ill = -1      
         foundp=False
-        for ll in listnamepatch:
+        for ll in patch_list:
+            ill+=1
 #            print ('1',ll)
             #we read patches in predict/ setnumber and found localisation    
-            debsl=ll.find('_')+1
-            endsl=ll.find('_',debsl)
-            slicename=int(ll[debsl:endsl])
-            debx=ll.find('_',endsl)+1
-            endx=ll.find('_',debx)
-            xpat=int(ll[debx:endx])
-            deby=ll.find('_',endx)+1
-            endy=ll.find('.',deby)
-            ypat=int(ll[deby:endy])
-
-         
-        #we find max proba from prediction
-            proba=preprob[ill]
+            slicename=ll[0]    
+            xpat=ll[1] 
+            ypat=ll[2]
+            probai=proba[ill]
            
-            prec, mprobai = maxproba(proba)
+            prec, mprobai = maxproba(probai)
             mproba=round(mprobai,2)
             classlabel=fidclass(prec)
             classcolor=classifc[classlabel]
 
 
             if  (slicenumber == slicename )  and (classlabel not in excluvisu):
-#                    print(setname, slicename,xpat,ypat,classlabel,classcolor,mproba)
-#                    print(mproba,preclass[ill],preprob[ill])
-#                    if slicenumber ==2:
-#                        print classlabel
-#                        print proba
+
                     foundp=True
                     if classlabel in listlabel:
                         numl=listlabel[classlabel]
@@ -730,8 +554,7 @@ def  visua(data):
 
                     imgt=cv2.add(imgt,imgi)
 
-            ill+=1
-#        tabsif=andmerg(tabsim1,tabsi) 
+           
 # calculmate contours of patches
         vis=drawContour(imgt,listlabel)
 #        print tablscan.shape
@@ -764,44 +587,10 @@ def  visua(data):
 #            tagviews(imgname,'average probability',0,0)           
             for ll in listlabel:
                 tagview(imgname,ll,str(listlabelaverage[ll]),175,00)
-#        else:   
-#            tagviews(imgname,'no recognised label',0,0)
-#            errorfile.write('no recognised label in: '+str(f)+' '+str (img)+'\n' )
-#            print('no recognised label in: '+str(f)+' '+str (img) )
-#    errorfile.write('\n'+'number of labels in :'+str(f)+'\n' )
+
     for classlabel in listlabelf:  
           print 'patient: ',core,', label:',classlabel,': ',listlabelf[classlabel]
-#          string=str(classlabel)+': '+str(listlabelf[classlabel])+'\n' 
-##          print string
-#          errorfile.write(string )
 
-def renomscan(fa):
-#    print(subdir)
-        #subdir = top/35
-        print('renomscan on:',f)
-        num=0
-        contenudir = os.listdir(fa)
-#        print(contenudir)
-        for ff in contenudir:
-#            print ff
-            if ff.find('.dcm')>0 and ff.find('-')<0:     
-                num+=1    
-                corfpos=ff.find('.dcm')
-                cor=ff[0:corfpos]
-                ncff=os.path.join(fa,ff)
-#                print ncff
-                if num<10:
-                    nums='000'+str(num)
-                elif num<100:
-                    nums='00'+str(num)
-                elif num<1000:
-                    nums='0'+str(num)
-                else:
-                    nums=str(num)
-                newff=cor+'-'+nums+'.dcm'
-    #            print(newff)
-                shutil.copyfile(ncff,os.path.join(fa,newff) )
-                os.remove(ncff)
 def dd(i):
     if (i)<10:
         o='0'+str(i)
@@ -818,11 +607,12 @@ print today
 def doPrediction(data):
 #    print data
     genebmp(data)
-    pavgene(data)
-    dataprocessing(data)
-    ILDCNNpredict(data)
-    visua(data)
+    plist=pavgene(data)
+#    dataprocessing(data)
+    proba=ILDCNNpredict(plist)
+    visua(data,proba,plist)
 
+#####################################################################
 #all directories
 cwd=os.getcwd()
 (cwdtop,tail)=os.path.split(cwd)
@@ -833,10 +623,6 @@ bmp_dir = os.path.join(path_patient, scanbmp)
 remove_folder(bmp_dir)    
 os.mkdir(bmp_dir)  
 
-patchpathdir = os.path.join(path_patient,patchpath)
-remove_folder(patchpathdir)    
-os.mkdir(patchpathdir) 
-
 jpegpathdir = os.path.join(path_patient,jpegpath)
 remove_folder(jpegpathdir)    
 os.mkdir(jpegpathdir)
@@ -844,15 +630,12 @@ os.mkdir(jpegpathdir)
 lung_dir = os.path.join(path_patient, lungmask)
 if os.path.exists(lung_dir)== False:
     os.mkdir(lung_dir)
+    
 lung_dir_bmp=os.path.join(lung_dir, lungmaskbmp)
 remove_folder(lung_dir_bmp)    
 os.mkdir(lung_dir_bmp)
-#    print 'patchpathdir:,',patchpathdir
-   
+
 picklein_file = os.path.join(path_patient,picklefile_source)
-predictout_f_dir = os.path.join(path_patient,picklefile_dest)
-remove_folder(predictout_f_dir)    
-os.mkdir(predictout_f_dir)
 
 predictout_dir = os.path.join(path_patient, predictout)   
 remove_folder(predictout_dir)
@@ -860,10 +643,10 @@ os.mkdir(predictout_dir)
 
 dirpatientfsdb=os.path.join(path_patient,sroi)
 
-
+##########################################################
 print('work on:',filedcm)
 #print filedcm
-#namedirtopcf = os.path.join(path_patient,f)
+
 doPrediction(filedcm)
 #    print namedirtopcf
         
@@ -873,4 +656,4 @@ t = datetime.datetime.now()
 today = str('date: '+dd(t.month)+'-'+dd(t.day)+'-'+str(t.year)+\
 '_'+dd(t.hour)+':'+dd(t.minute)+':'+dd(t.second))
 print today
-#errorfile.close() 
+
