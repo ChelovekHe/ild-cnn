@@ -89,5 +89,5 @@ model description, compilation and evaluation
 - main outputs:
 	* doPrediction function returns 2 variables: "p" and "l"
 	* variable "p":this is an np array of length n, n being the number of patches and (c tuples with probabilities ordered by classes number,c being the nuber of classes, defined in the model in "pickle_source" directory)
-	* variable "l" this is an np array of length n with the list of patches in the format: (slice number, upper left corner x, upper left corner y)
+	* variable "l" this is an np array of length n with the list of patches in the format: (slice number, upper left corner x, upper left corner y, patch image as array)
 
