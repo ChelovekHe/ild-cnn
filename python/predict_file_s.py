@@ -1,28 +1,23 @@
 # coding: utf-8
-#Sylvain Kritter 11 septembre 2016
+#Sylvain Kritter 15 Sept 2016
 """general parameters and file, directory names"""
 
 import os
 import cv2
-
+import datetime
 import dicom
 import scipy
-from scipy import misc
 import shutil
 import numpy as np
-
-import cPickle as pickle
 import ild_helpers as H
 import cnn_model as CNN4
 from keras.models import model_from_json
-
 
 #########################################################
 # for predict
 # with or without bg (true if with back_ground)
 wbg=False
-#to enhance contrast on patch put True
-contrast=True
+
 #threshold for patch acceptance
 thr = 0.9
 
@@ -30,32 +25,23 @@ thr = 0.9
 filedcm = '../predict_file/CT-2321-0011.dcm'
 namedirtop='predict_file'
 
-#directory for patches from scan images
-patchpath='patch_bmp'
-
 #subdirectory name to put images
 jpegpath = 'patch_jpeg'
 
 #directory with lung mask dicom
 lungmask='lung_mask'
+
 #directory to put  lung mask bmp
 lungmaskbmp='bmp'
+
+#directory name with scan with roi if exists
+sroi='sroi'
 
 #directory with bmp from dicom
 scanbmp='scan_bmp'
 
-
-#pickle with predicted probabilities
-predicted_proba= 'predicted_probabilities.pkl'
-#pickle with Xfile
-Xprepkl='X_predict.pkl'
-Xrefpkl='X_file_reference.pkl'
-
-#subdirectory name to colect pkl files resulting from prediction
-picklefile_dest='pickle_dest'
 #subdirectory name to colect weights
 picklefile_source='pickle_source'
-
 
 #end predict part
 #########################################################
@@ -71,35 +57,21 @@ dimpavy = 32
 pxy=float(dimpavx*dimpavy)*255
 
 #end general part
-
+#print path_patient
 #########################################################
 
+#color of labels
 
+red=(255,0,0)
+green=(0,255,0)
+blue=(0,0,255)
+yellow=(255,255,0)
+cyan=(0,255,255)
+purple=(255,0,255)
+white=(255,255,255)
+darkgreen=(11,123,96)
 
-#all the possible labels
-classifstart ={
-'back_ground':0,
-'consolidation':1,
-'fibrosis':2,
-'ground_glass':3,
-'healthy':4,
-'micronodules':5,
-'reticulation':6,
-
-'air_trapping':7,
- 'bronchial_wall_thickening':8,
- 'bronchiectasis':9,
- 'cysts':10,
- 'early_fibrosis':11,
- 'emphysema':12,
- 'increased_attenuation':13,
- 'macronodules':14,
- 'pcp':15,
- 'peripheral_micronodules':16,
- 'tuberculosis':17
-  }
-
-#only label we consider, number will start at 0 anyway
+# label we consider, number will start at 0 anyway
 if wbg :
     classif ={
     'back_ground':0,
@@ -143,7 +115,27 @@ else:
       }
 
 
+classifc ={
+'back_ground':darkgreen,
+'consolidation':red,
+'fibrosis':blue,
+'ground_glass':yellow,
+'healthy':green,
+'micronodules':cyan,
+'reticulation':purple,
 
+'air_trapping':white,
+ 'bronchial_wall_thickening':white,
+ 'bronchiectasis':white,
+ 'cysts':white,
+ 'early_fibrosis':white,
+ 'emphysema':white,
+ 'increased_attenuation':white,
+ 'macronodules':white,
+ 'pcp':white,
+ 'peripheral_micronodules':white,
+ 'tuberculosis':white
+ }
 
 
 def remove_folder(path):
@@ -152,17 +144,14 @@ def remove_folder(path):
     if os.path.exists(path):
          # remove if exists
          shutil.rmtree(path)
-
    
 def genebmp(data):
     """generate patches from dicom files"""
     print ('load dicom files in :',data)
 
     RefDs = dicom.read_file(data) 
-    (top,tail)=os.path.split(data)
-   
-    endnumslice=tail.find('.dcm')
-     
+    (top,tail)=os.path.split(data)   
+    endnumslice=tail.find('.dcm')    
     core=tail[0:endnumslice]
 #    print core
     posend=endnumslice
@@ -178,7 +167,6 @@ def genebmp(data):
     
 #generate bmp for lung    
     
-     
     listlung=os.listdir(lung_dir)
 #    print listlung
     lungexist=False
@@ -214,11 +202,11 @@ def genebmp(data):
 def normi(img):
      """ normalise patches 0 255"""
      tabi = np.array(img)
-
+#     print(tabi.min(), tabi.max())
      tabi1=tabi-tabi.min()
-
+#     print(tabi1.min(), tabi1.max())
      tabi2=tabi1*(255/float(tabi1.max()-tabi1.min()))
-
+#     print(tabi2.min(), tabi2.max())
      return tabi2 
     
 
@@ -227,6 +215,7 @@ def pavgene (data):
     """ generate patches from scan"""
     print('generate patches on: ',data)
 #    print data
+    patch_list=[]
 
     endnumslice=data.find('.dcm')
     posend=endnumslice
@@ -238,12 +227,14 @@ def pavgene (data):
 #    print slicenumberscan    
     (top,tail)=os.path.split(data)
    
-#    print tail
+#    print 'tail' ,tail
     endnumslice=tail.find('.dcm')    
     core=tail[0:endnumslice]
     corefull=core+'.bmp'
     imagedir=os.path.join(bmp_dir,corefull)
-         
+#    (top,tail)=os.path.split(top)
+      
+    
     listlung=os.listdir(lung_dir_bmp)
     for  n in listlung:    
             tabp = np.zeros((dimtabx, dimtaby,3), dtype='i')
@@ -267,6 +258,9 @@ def pavgene (data):
 #                cv2.waitKey(0)
                 imgray = cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
                 ret,thresh = cv2.threshold(imgray,0,255,0)
+                                        
+#                cv2.imshow('image',img2)
+#                cv2.waitKey(0)
                 atabf = np.nonzero(thresh)
                 imagemax= cv2.countNonZero(imgray)
 
@@ -287,9 +281,12 @@ def pavgene (data):
                 while x <= xmax:
                     y=ymin
                     while y<=ymax:
-                        crop_img = thresh[y:y+dimpavy, x:x+dimpavx]              
+                        crop_img = thresh[y:y+dimpavy, x:x+dimpavx]
+#              
         # convention img[y: y + h, x: x + w]
-
+#                  
+#                    cv2.imshow('image',crop_img)
+#                    cv2.waitKey(0)
                         area= crop_img.sum()
 #         
                         targ=float(area)/pxy
@@ -302,71 +299,48 @@ def pavgene (data):
                             imagemax= cv2.countNonZero(imgray)
                             min_val, max_val, min_loc,max_loc = cv2.minMaxLoc(imgray)
 #                        print imagemax
-
-                     
+                    
                             if imagemax>0 and min_val!=max_val:
-
                                 nbp+=1
-                                nampa='p_'+str(slicenumberscan)+'_'+str(x)+'_'+str(y)+'.bmp'                            
 #                                normpatch = cv2.equalizeHist(imgray)
                                 na=np.array(imgray)
-                                normpatch=normi(na)
-                                fw=os.path.join(patchpathdir,nampa)                               
-                                cv2.imwrite(fw,normpatch)                           
-                           
-                            #we cancel the source                         
-                                thresh[y:y+dimpavy, x:x+dimpavx]=0                            
-                                y+=dimpavy-1
-            
+                                normpatch=normi(na)  
+                                patch_list.append((slicenumberl,x,y,normpatch))
+                            
+                        #                print('pavage',i,j)  
+                                i=0
+                                while i < dimpavx:
+                                    j=0
+                                    while j < dimpavy:
+                                        if y+j<512 and x+i<512:
+                                            tabp[y+j][x+i]=red
+                                        if i == 0 or i == dimpavx-1 :
+                                            j+=1
+                                        else:
+                                            j+=dimpavy-1
+                                    i+=1
+                            #we cancel the source                            
+                                thresh[y:y+dimpavy, x:x+dimpavx]=0
+                                
+                                y+=dimpavy-1                                                  
                         y+=1
                     x+=1
             
             tabp =imglung+tabp
 
-            scipy.misc.imsave(jpegpathdir+'/s_'+str(slicenumberscan)+'.jpg', tabp)
             break
+    return patch_list
 
-
-
-def dataprocessing(data):
-    
-    print ('generate data for CNN on: ',data)
-
-    # list for the merged pixel data
-    dataset_list = []
-    # list of the file reference data
-    file_reference_list = []
-    image_files = (os.listdir(patchpathdir))
-    # go through all image files
-    # 
-    for fil in image_files:
-#        print fil
-        if fil.find('.bmp') > 0:  
-#            print fil             
-            # load the .bmp file into memory       
-            image = misc.imread(os.path.join(str(patchpathdir),fil), flatten= 0)        
-            # append the array to the dataset list
-            dataset_list.append(image)      
-            # append the file name to the reference list. The objective here is to ensure that the data 
-            # and the file information about the x/y position is guamarteed        
-            file_reference_list.append(fil)
-                
-    # transform dataset list into numpy array                   
-
-    X = np.array(dataset_list)
-    # this is already in greyscale 
-    file_reference = np.array(file_reference_list)
-#   
-    #dir to put pickle files
-
-    xfp=os.path.join(predictout_f_dir,Xprepkl)
-    xfpr=os.path.join(predictout_f_dir,Xrefpkl)
-    pickle.dump(X, open( xfp, "wb" ))
-    pickle.dump(file_reference, open( xfpr, "wb" ))
 # 
-def ILDCNNpredict(data):     
-        print ('predict patches on: ',data) 
-     
+def ILDCNNpredict(patch_list)   :  
+        dataset_list=[]
+        for fil in patch_list:
+
+            dataset_list.append(fil[3])
+
+        X = np.array(dataset_list)
+        X_predict = np.asarray(np.expand_dims(X,1))/float(255)        
+        
         jsonf= os.path.join(picklein_file,'ILD_CNN_model.json')
 #        print jsonf
         weigf= os.path.join(picklein_file,'ILD_CNN_model_weights')
@@ -388,32 +362,40 @@ def ILDCNNpredict(data):
      'tolerance': args.tol if args.tol else 1.005,     # Tolerance parameter for early stoping [default: 1.005, checks if > 0.5%]
      'res_alias': args.csv if args.csv else 'res'      # csv results filename alias
          }
+#        model = H.load_model()
 
         model = model_from_json(open(jsonf).read())
         model.load_weights(weigf)
+
         model.compile(optimizer='Adam', loss=CNN4.get_Obj(train_params['obj']))        
-#
-        patient_pred_file =os.path.join( predictout_f_dir,Xprepkl)
-        X_predict = pickle.load( open( patient_pred_file, "rb" ) )
 
-    # adding a singleton dimension and rescale to [0,1]
-        X_predict = np.asarray(np.expand_dims(X_predict,1))/float(255)
-
-    # predict and store  classification and probabilities 
         proba = model.predict_proba(X_predict, batch_size=100)
-    # store  classification and probabilities 
-        xfproba=os.path.join( predictout_f_dir,predicted_proba)
-        pickle.dump(proba, open( xfproba, "wb" ))
 
+        return proba
+
+
+def dd(i):
+    if (i)<10:
+        o='0'+str(i)
+    else:
+        o=str(i)
+    return o
+    
+t = datetime.datetime.now()
+
+today = str('date: '+dd(t.month)+'-'+dd(t.day)+'-'+str(t.year)+\
+'_'+dd(t.hour)+':'+dd(t.minute)+':'+dd(t.second))
+print today
 
 def doPrediction(data):
 #    print data
     genebmp(data)
-    pavgene(data)
-    dataprocessing(data)
-    ILDCNNpredict(data)
+    plist=pavgene(data)
+#    dataprocessing(data)
+    proba=ILDCNNpredict(plist)
+    return proba,plist
 
-
+#####################################################################
 #all directories
 cwd=os.getcwd()
 (cwdtop,tail)=os.path.split(cwd)
@@ -424,31 +406,30 @@ bmp_dir = os.path.join(path_patient, scanbmp)
 remove_folder(bmp_dir)    
 os.mkdir(bmp_dir)  
 
-patchpathdir = os.path.join(path_patient,patchpath)
-remove_folder(patchpathdir)    
-os.mkdir(patchpathdir) 
-
-jpegpathdir = os.path.join(path_patient,jpegpath)
-remove_folder(jpegpathdir)    
-os.mkdir(jpegpathdir)
-
 lung_dir = os.path.join(path_patient, lungmask)
 if os.path.exists(lung_dir)== False:
     os.mkdir(lung_dir)
+    
 lung_dir_bmp=os.path.join(lung_dir, lungmaskbmp)
 remove_folder(lung_dir_bmp)    
 os.mkdir(lung_dir_bmp)
-#    print 'patchpathdir:,',patchpathdir
-   
+
 picklein_file = os.path.join(path_patient,picklefile_source)
-predictout_f_dir = os.path.join(path_patient,picklefile_dest)
-remove_folder(predictout_f_dir)    
-os.mkdir(predictout_f_dir)
 
 
+dirpatientfsdb=os.path.join(path_patient,sroi)
+
+##########################################################
 print('work on:',filedcm)
 #print filedcm
 
-doPrediction(filedcm)
-
+(p,l)=doPrediction(filedcm)
+#    print namedirtopcf
+        
+print('completed on: ',filedcm)
+        
+t = datetime.datetime.now()
+today = str('date: '+dd(t.month)+'-'+dd(t.day)+'-'+str(t.year)+\
+'_'+dd(t.hour)+':'+dd(t.minute)+':'+dd(t.second))
+print today
 
