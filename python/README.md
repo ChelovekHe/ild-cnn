@@ -76,19 +76,19 @@ model description, compilation and evaluation
 	predict_file_s.py
 
 -same that predict_file.py, without visualization, only usefull lines
-- generate predictidet probabilities for one dicom file
+- generate predicted probabilities for one dicom file
 - main inputs: (all as variables at top of py file)
 	* name of dicom file in variable: "filedcm" (complete path)
-	* directory where this file is in "namedirtop" variable. note: several directories will be created in it
+	* directory where this file is in "namedirtop" variable. Note: several directories will be created in it
 	* lung mask data: in "lung_mask" directory for dicom
 	* model and weights in "pickle_source" directories
 	* a switch to define if back-ground is used or not : "wbg" (False by default)
 	* size of dicom (512x512) and patches (32x32)
-	* list of classes with their number (must start at 0) in dictionary "classif"
+	* list of classes with their number (must start at 0) in dictionary "classif", compatible with model of CNN
 - main outputs:
 	* doPrediction function returns 2 variables: "p" and "l"
-	* variable "p":this is an np array of length n, n being the number of patches, of c-tuples with probabilities ordered by classes number,c being the nuber of classes, defined in the model in "pickle_source" directory)
-	* variable "l" this is an np array of length n with the list of patches in the format: (slice number, upper left corner x, upper left corner y, patch image as array)
+	* variable "p":this is an np array of length n, n being the number of patches, of c-tuples with probabilities ordered by classes number, c being the number of classes, defined in the model in "pickle_source" directory)
+	* variable "l: this is an np array of length n with the list of patches in the format: (slice number, upper left corner x, upper left corner y, patch image as array)
 	* scan image converted in bmp format in directory "scan_bmp"
-	* lung mask in bmp format in dirctory "lung_mask/bmp"
+	* lung mask in bmp format in directory "lung_mask/bmp"
 
