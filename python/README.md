@@ -87,7 +87,7 @@ model description, compilation and evaluation
 	* size of dicom (512x512) and patches (32x32)
 	* list of classes with their number (must start at 0) in dictionary "classif"
 - main outputs:
-	* predicted probabilities in "pickle_dest" this is an np array (n tuples with probabilities ordered bu by classes number)
-	* X_file_reference.pkl: np array of file name of patches images, same order than predicted_probabilities
-	* patches in bmp are in directory "patch_bmp"
+	*doPrediction function returns 2 varaibles: "p" and "l"
+	*variable "p":this is an np array of length n, n being the number of patches and (c tuples with probabilities ordered by classes number,c being the nuber of classes, defined in the model in "pickle_source" directory)
+	*variable "l" this is an np array of length n with the list of patches in the format (slice number, upper left corner x, upper left corner y)
 
