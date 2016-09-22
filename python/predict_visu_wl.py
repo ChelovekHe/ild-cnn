@@ -30,10 +30,10 @@ wbg=True
 contrast=True
 #path for visua back-ground
 vbg='A'
-#threshold for patch acceptance
+#threshold for patch acceptance overlapp
 thrpatch = 0.9
 #threshold for probability prediction
-thrproba = 0.7
+thrproba = 0.5
 #threshold for lung acceptance
 thrlung=0.5
 #normalization internal procedure or openCV
@@ -985,7 +985,7 @@ def  visua(dirpatientdb,cla,wra):
                 t0='average probability'
             else:
                 t0='no recognised label'
-            t1='n: '+dptail+' scan: '+str(slicenumber)        
+            t1='n: '+topdir+' scan: '+str(slicenumber)        
             t2='CONFIDENTIAL - prototype - not for medical use'
             t3='For threshold: '+str(thrproba)+' :'
             t4=time.asctime()
