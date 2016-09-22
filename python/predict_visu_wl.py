@@ -33,7 +33,7 @@ vbg='A'
 #threshold for patch acceptance
 thrpatch = 0.9
 #threshold for probability prediction
-thrproba = 0
+thrproba = 0.7
 #threshold for lung acceptance
 thrlung=0.5
 #normalization internal procedure or openCV
@@ -152,7 +152,7 @@ font10 = ImageFont.truetype( 'arial.ttf', 10)
 errorfile = open(path_patient+'/predictlog.txt', 'w') 
 
 #color of labels
-
+black=(0,0,0)
 red=(255,0,0)
 green=(0,255,0)
 blue=(0,0,255)
@@ -436,11 +436,11 @@ def pavgenelung(dn,nd,sln):
     scipy.misc.imsave(jpegpathf+'/'+'l_'+str(sln)+'.bmp', tabf)
 # 
         
-def addpatch(col,lab, xt,yt):
+def addpatch(col,lab, xt,yt,px,py):
     imgi = np.zeros((dimtabx,dimtaby,3), np.uint8)
 #    colr=[col[2],col[1],col[0]]
 #    numl=listlabel[lab]
-    tablint=[(xt,yt),(xt,yt+lungdimpavy),(xt+lungdimpavx,yt+lungdimpavy),(xt+lungdimpavx,yt)]
+    tablint=[(xt,yt),(xt,yt+py),(xt+px,yt+py),(xt+px,yt)]
     tabtxt=np.asarray(tablint)
 #    print tabtxt
     cv2.polylines(imgi,[tabtxt],True,col)
@@ -494,7 +494,7 @@ def  genelung(dn,nd,sln):
                     if slicename == sln: 
                         if mprobai> thrlung and classlabel=='lung':
 #                                print classcolor,classlabel
-                                imgi=addpatch(classcolor,classlabel,xpat,ypat)
+                                imgi=addpatch(classcolor,classlabel,xpat,ypat,lungdimpavx,lungdimpavy)
                                 imgt=cv2.add(imgt,imgi)
         
                     ill+=1
@@ -704,7 +704,7 @@ def fidclass(numero,classn):
         return 'unknown'
 
  
-def tagviewn(fig,label,pro,x,y):
+def tagview(fig,label,pro,x,y):
     """write text in image according to label and color"""
 
     col=classifc[label]
@@ -726,16 +726,18 @@ def tagviewn(fig,label,pro,x,y):
     cv2.putText(fig,label+' '+pro,(x+deltax, y+deltay+10),cv2.FONT_HERSHEY_PLAIN,0.8,col,1)
 
     
-def tagviews(fig,t0,x0,y0,t1,x1,y1,t2,x2,y2,t3,x3,y3,t4,x4,y4):
+def tagviews(b,fig,t0,x0,y0,t1,x1,y1,t2,x2,y2,t3,x3,y3,t4,x4,y4):
     """write simple text in image """
     imgn=ImagePIL.open(fig)
     draw = ImageDraw.Draw(imgn)
-    draw.rectangle ([x1, y1,x1+100, y1+15],outline='black',fill='black')
-    draw.rectangle ([140, 0,512,75],outline='black',fill='black')
+    if b:
+        draw.rectangle ([x1, y1,x1+100, y1+15],outline='black',fill='black')
+        draw.rectangle ([140, 0,512,75],outline='black',fill='black')
     draw.text((x0, y0),t0,white,font=font10)
     draw.text((x1, y1),t1,white,font=font10)
     draw.text((x2, y2),t2,white,font=font10)
-#    draw.text((x3, y3),t3,white,font=font10)
+    if not b:
+        draw.text((x3, y3),t3,white,font=font10)
     draw.text((x4, y4),t4,white,font=font10)
     imgn.save(fig)
 
@@ -813,6 +815,47 @@ def loadpkllung(do):
     return (preprob,prefile)
 
 
+
+def drawContour(imi,ll):
+    
+    vis = np.zeros((dimtabx,dimtaby,3), np.uint8)
+    for l in ll:
+#        print l
+        col=classifc[l]
+
+        masky=cv2.inRange(imi,col,col)
+        outy=cv2.bitwise_and(imi,imi,mask=masky)
+        imgray = cv2.cvtColor(outy,cv2.COLOR_BGR2GRAY)
+        ret,thresh = cv2.threshold(imgray,0,255,0)
+        im2,contours0, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,\
+        cv2.CHAIN_APPROX_SIMPLE)        
+        contours = [cv2.approxPolyDP(cnt, 0, True) for cnt in contours0]
+#        cv2.drawContours(vis,contours,-1,col,1,cv2.LINE_AA)
+        cv2.drawContours(vis,contours,-1,col,1)
+
+    return vis
+
+def tagviewn(fig,label,pro,nbr,x,y):
+    """write text in image according to label and color"""
+
+    col=classifc[label]
+#    print col, label
+    if wbg :
+        labnow=classif[label]-1
+    else:
+        labnow=classif[label]
+#    print (labnow, text)
+    if label == 'back_ground':
+        x=0
+        y=0        
+        deltax=0
+        deltay=60
+    else:        
+        deltay=11*((labnow)%5)
+        deltax=175*((labnow)//5)
+
+    cv2.putText(fig,str(nbr)+' '+label+' '+pro,(x+deltax, y+deltay+10),cv2.FONT_HERSHEY_PLAIN,0.8,col,1)
+
 def  visua(dirpatientdb,cla,wra):
 
     (dptop,dptail)=os.path.split(dirpatientdb)
@@ -827,7 +870,8 @@ def  visua(dirpatientdb,cla,wra):
         listelabelfinal[topdir,fidclass(i,classif)]=0
     #directory name with predict out dabasase, will be created in current directory
     predictout_dir = os.path.join(dirpatientdb, predictout)
-    predictout_dir_th = os.path.join(predictout_dir,vbg)
+    predictout_dir_bv = os.path.join(predictout_dir,vbg)
+    predictout_dir_th = os.path.join(predictout_dir,str(thrproba))
     (preprob,listnamepatch)=loadpkl(dirpatientdb)
 #    print preprob[0], listnamepatch
     dirpatientfdb=os.path.join(dirpatientdb,scanbmp)
@@ -836,8 +880,10 @@ def  visua(dirpatientdb,cla,wra):
 #    print dirpatientfdb
     listlabelf={}
     for img in listbmpscan:
-
+        imgt = np.zeros((dimtabx,dimtaby,3), np.uint8)
+        listlabelaverage={}
         listlabel={}
+        listlabelrec={}
         if os.path.exists(dirpatientfsdb):
             imgc=os.path.join(dirpatientfsdb,img)
         else:
@@ -861,10 +907,14 @@ def  visua(dirpatientdb,cla,wra):
       
         foundp=False
         for ll in listnamepatch:
-            slicename=ll[0]    
+            slicename=ll[0] 
+            xpat=ll[1]
+            ypat=ll[2]
             proba=preprob[ill]          
             prec, mprobai = maxproba(proba)
-            classlabel=fidclass(prec,classif)           
+            mproba=round(mprobai,2)
+            classlabel=fidclass(prec,classif) 
+            classcolor=classifc[classlabel]
 #            print slicenumber, slicename,dptail
             if slicenumber == slicename and\
             (dptail in datahealthy or (classlabel not in excluvisu)):
@@ -880,26 +930,70 @@ def  visua(dirpatientdb,cla,wra):
                         listlabelf[classlabel]=nlt+1
                     else:
                         listlabelf[classlabel]=1
+                        
+            if mproba >thrproba and slicenumber == slicename and\
+             (dptail in datahealthy or (classlabel not in excluvisu)):
+
+                    if classlabel in listlabelrec:
+                        numl=listlabelrec[classlabel]
+                        listlabelrec[classlabel]=numl+1
+                        cur=listlabelaverage[classlabel]
+                        averageproba= round((cur*numl+mproba)/(numl+1),2)
+                        listlabelaverage[classlabel]=averageproba
+                    else:
+                        listlabelrec[classlabel]=1
+                        listlabelaverage[classlabel]=mproba
+
+                    imgi=addpatch(classcolor,classlabel,xpat,ypat,dimpavx,dimpavy)
+                    imgt=cv2.add(imgt,imgi)
+                        
+                        
 
             ill+=1
 
         if wra:        
             imgcorefull=imgcore+'.bmp'
-            imgname=os.path.join(predictout_dir_th,imgcorefull)
+            imgnameth=os.path.join(predictout_dir_th,imgcorefull)
+            imgnamebv=os.path.join(predictout_dir_bv,imgcorefull)
     #        print 'imgname',imgname    
-            cv2.imwrite(imgname,tablscan)
-               
+            cv2.imwrite(imgnamebv,tablscan)
+            vis=drawContour(imgt,listlabel)
+#        print tablscan.shape
+#put to zero the contour in image in order to get full visibility of contours
+            img2gray = cv2.cvtColor(vis,cv2.COLOR_BGR2GRAY)
+            ret, mask = cv2.threshold(img2gray, 10, 255, cv2.THRESH_BINARY)
+            mask_inv = cv2.bitwise_not(mask)
+            img1_bg = cv2.bitwise_and(tablscan,tablscan,mask = mask_inv)  
+#superimpose scan and contours           
+            imn=cv2.add(img1_bg,vis)
+
+
+            if foundp:
+#            tagviews(imgname,'average probability',0,0)           
+                for ll in listlabelrec:
+                    tagviewn(imn,ll,str(listlabelaverage[ll]),listlabelrec[ll],175,00)
+            else:   
+#            tagviews(imgname,'no recognised label',0,0)
+                errorfile.write('no recognised label in: '+str(topdir)+' '+str (img)+'\n' )
+
+            imn = cv2.cvtColor(imn, cv2.COLOR_BGR2RGB)
+            cv2.imwrite(imgnamebv,tablscan)
+            cv2.imwrite(imgnameth,imn)            
+            
+       
             if foundp:
                 t0='average probability'
             else:
                 t0='no recognised label'
             t1='n: '+dptail+' scan: '+str(slicenumber)        
             t2='CONFIDENTIAL - prototype - not for medical use'
-            t3='threshold: '+str(thrproba)
+            t3='For threshold: '+str(thrproba)+' :'
             t4=time.asctime()
-            tagviews(imgname,t0,0,0,t1,0,20,t2,20,485,t3,0,40,t4,0,50)
+            tagviews(True,imgnamebv,t0,0,0,t1,0,20,t2,20,485,t3,0,38,t4,0,500)
+            tagviews(False,imgnameth,t0,0,0,t1,0,20,t2,20,485,t3,0,38,t4,0,500)
+
         
-            errorfile.write('\n'+'number of labels in :'+str(dptail)+'\n' )
+            errorfile.write('\n'+'number of labels in :'+str(topdir)+' '+str(dptail)+str (img)+'\n' )
 #    print listlabelf
     for classlabel in listlabelf:  
           listelabelfinal[topdir,classlabel]=listlabelf[classlabel]
@@ -1015,6 +1109,7 @@ def retrievepatch(x,y,top,sln,pr,li):
                              n=n+1
                              strw=fidclass(j,classif)+ ' {0:.1f}%'.format(100*proba[j])                             
                              cv2.putText(tabtext,strw,(370,460+10*n),cv2.FONT_HERSHEY_PLAIN,0.8,(0,255,0),1)
+                             
                              print fidclass(j,classif), ' {0:.2f}%'.format(100*proba[j])
                      print'found'
                      break 
@@ -1075,9 +1170,10 @@ def drawpatch(t,lp,preprob,k,top):
 #            print listlabel        
     for ll1 in listlabel:
 #                print ll1,listlabelaverage[ll1]
-                tagviewn(imgn,ll1,str(listlabelaverage[ll1]),175,00)
-    
-
+                tagviewn(imgn,ll1,str(listlabelaverage[ll1]),listlabel[ll1],175,00)
+    ts='Treshold:'+str(t)
+#    cv2.putText(imgn,ts,(0,42),cv2.FONT_HERSHEY_PLAIN,1,white,0.8,cv2.LINE_AA)
+    cv2.putText(imgn,ts,(0,42),cv2.FONT_HERSHEY_PLAIN,0.8,white,1,cv2.LINE_AA)
     return imgn
     
 def opennew(dirk, fl,L):
