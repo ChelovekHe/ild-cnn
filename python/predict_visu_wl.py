@@ -23,6 +23,21 @@ import cnn_model as CNN4
 from keras.models import model_from_json
 from Tkinter import *
 
+#global environment
+
+picklefileglobal='MHKpredictglobal.pkl'
+instdirMHK='MHKpredict'
+workdiruser='Documents/boulot/startup/radiology/PREDICT'
+
+tempofile=os.path.join(os.environ['TMP'],picklefileglobal)
+workingdir= os.path.join(os.environ['USERPROFILE'],workdiruser)
+instdir=os.path.join(os.environ['LOCALAPPDATA'],instdirMHK)
+
+#
+#print 'instdir', instdir
+#print 'workdir', workingfull
+
+
 #########################################################
 # with or without bg (true if with back_ground)
 wbg=True
@@ -36,8 +51,14 @@ thrpatch = 0.9
 thrproba = 0.5
 #threshold for lung acceptance
 thrlung=0.5
+
+#subsample by default
+subsdef=10
 #normalization internal procedure or openCV
 normiInternal=True
+
+#workingdirectory='C:\Users\sylvain\Documents\boulot\startup\radiology\PREDICT'
+#installdirectory='C:\Users\sylvain\Documents\boulot\startup\radiology\UIP\python'
 #global directory for predict file
 namedirtop = 'predict_e'
 
@@ -66,13 +87,16 @@ lungXprepkl='lung_X_predict.pkl'
 lungXrefpkl='lung_X_file_reference.pkl'
 
 #file to store different parameters
-subsamplef='subsample.txt'
+subsamplef='subsample.pkl'
 
 #subdirectory name to colect pkl files for prediction
 picklefile='pickle_sk32'
 
 #subdirectory name to colect pkl filesfor lung  prediction
 picklefilelung='pickle_s5_lung'
+
+
+
 
 # list label not to visualize
 excluvisu=['back_ground','healthy']
@@ -98,16 +122,41 @@ lungdimpavy = 15
 
 
 #########################################################################
-
-
 cwd=os.getcwd()
+glovalf=tempofile
+path_patient = os.path.join(workingdir,namedirtop)
+varglobal=(thrpatch,thrproba,path_patient,subsdef)
+
+def setva():
+        global varglobal,thrlung,thrpatch,subsdef,path_patient
+        if not os.path.exists(glovalf) :
+            pickle.dump(varglobal, open( glovalf, "wb" ))
+        else:
+            dd = open(glovalf,'rb')
+            my_depickler = pickle.Unpickler(dd)
+            varglobal = my_depickler.load()
+            dd.close() 
+#            print varglobal
+            path_patient=varglobal[2]
+#            print path_patient
+            thrlung=varglobal[1]
+            thrpatch=varglobal[0]
+            subsdef=varglobal[3]
+
+
+
+def newva():
+ pickle.dump(varglobal, open( glovalf, "wb" ))
+
+
 (cwdtop,tail)=os.path.split(cwd)
-path_patient = os.path.join(cwdtop,namedirtop)
+
 if not os.path.exists(path_patient):
     print 'patient directory does not exists'
     sys.exit()
-    
-picklein_file = os.path.join(cwdtop,picklefile)
+
+setva()   
+picklein_file = os.path.join(instdir,picklefile)
 if not os.path.exists(picklein_file):
     print 'model and weight directory does not exists'
     sys.exit()
@@ -1209,13 +1258,13 @@ def openfichier(k,dirk,top,L):
         ncf=ncf1
             
 
-    subfile=os.path.join(dop,subsamplef)
-    filesub=open(subfile,"r")
-    fr=filesub.read()
-    filesub.close()
-    pnsub=fr.find(' ',0)
-    nsub=fr[pnsub+1:len(fr)]
-    subsample=int(nsub)
+#    subfile=os.path.join(dop,subsamplef)
+#    filesub=open(subfile,"r")
+#    fr=filesub.read()
+#    filesub.close()
+#    pnsub=fr.find(' ',0)
+#    nsub=fr[pnsub+1:len(fr)]
+    subsample=varglobal[3]
     pdirk = os.path.join(dirk,k)
     img = cv2.imread(pdirk,1)
 #    print 'openfichier:',k , ncf, pdirk,top
@@ -1362,7 +1411,7 @@ def listbtn(L):
     for widget in cadrerun.winfo_children():       
                 widget.destroy()    
     for k in L:
-            Button(cadrerun,text=k,command=lambda k = k: opendir(k)).pack(side=LEFT,fill="both",\
+            Button(cadrerun,text=k,command=lambda k = k: opendir(k)).pack(side=TOP,fill="both",\
             expand=1)
 
 def runf():
@@ -1380,14 +1429,24 @@ def quit():
     fenetre.quit()
     fenetre.destroy()   
 
-def runpredict(pp,subs, retou):
+def runpredict(pp,subs,thrp, thproba,retou):
     
-    global classdirec,path_patient, patch_list, dataset_list, nameset_list, proba
+    global classdirec,path_patient, patch_list, \
+           dataset_list, nameset_list, proba,subsdef,varglobal,thrproba
+    for widget in cadretop.winfo_children():       
+                widget.destroy()    
+    
 #    cadrestatus.grid(row=1)
+    
     cw = Label(cadrestatus, text="Running",fg='red',bg='blue')
     cw.pack(side=TOP,fill=X)
-
+    thrpatch=thrp
+    thrproba=thproba
+    subsdef =subs
     path_patient=pp
+    varglobal=(thrpatch,thrproba,path_patient,subsdef)  
+    newva()
+    runl()
 #    print path_patient
     if os.path.exists(path_patient):
        patient_list= os.walk(path_patient).next()[1]
@@ -1456,10 +1515,10 @@ def runpredict(pp,subs, retou):
                 remove_folder(jpegpathf)    
                 os.mkdir(jpegpathf)
                 
-                subfile=os.path.join(pickledir,subsamplef)
-                subfilec = open(subfile, 'w')
-                subfilec.write('subsample '+str(subs)+'\n' )
-                subfilec.close()
+#                subfile=os.path.join(pickledir,subsamplef)
+#                subfilec = open(subfile, 'w')
+#                subfilec.write('subsample '+str(subs)+'\n' )
+#                subfilec.close()
                 
                 for scanumber in range(0,numberFile):
         #            print scanumber
@@ -1470,10 +1529,11 @@ def runpredict(pp,subs, retou):
             
                 pavgene(namedirtopcf)
                 ILDCNNpredict(namedirtopcf)
-                visua(namedirtopcf,classdirec,True)
-    
-            else:
-                    
+                visua(namedirtopcf,classdirec,True)   
+                spkl=os.path.join(pickledir,subsamplef)
+                pickle.dump(subs, open( spkl, "wb" ))
+                
+            else:                    
                 visua(namedirtopcf,classdirec,False)
             print('completed on: ',f)     
        
@@ -1510,7 +1570,9 @@ def runl1 ():
     runl()
 
 def runl ():
-    global path_patient
+    global path_patient,varglobal
+    runalready=False
+#    print path_patient  varglobal=(thrpatch,thrproba,path_patient,subsdef)
     bouton_quit = Button(cadretop, text="Quit", command= quit,bg='red',fg='yellow')
     bouton_quit.pack(side="top")
     separator = Frame(cadretop,height=2, bd=10, relief=SUNKEN)
@@ -1519,10 +1581,10 @@ def runl ():
     w.pack(side=TOP,fill='both')
     
     clepp = StringVar()
-
     e = Entry(cadretop, textvariable=clepp,width=98)
     e.delete(0, END)
-    e.insert(0, path_patient)
+    e.insert(0, varglobal[2])
+#    e.insert(0, workingdir)
     e.pack(side=TOP,fill='both',expand=1)
 ##   
     if os.path.exists(path_patient):
@@ -1534,8 +1596,15 @@ def runl ():
             ld=os.path.join(path_patient,l)
             if os.path.isdir(ld):
                 tow =tow+l+' - '
+                pdir=os.path.join(ld,picklefile)
             ll = Label(cadretop, text=tow,fg='blue')
-        ll.pack()
+            
+        ll.pack(side =TOP)
+        print pdir
+        if os.path.exists(pdir):
+            runalready=True
+             
+
     else:     
         ll = Label(cadretop, text='path_patient does not exist:',fg='red',bg='yellow')
         ll.pack()
@@ -1545,23 +1614,42 @@ def runl ():
 
     wcadre5 = Label(cadretop, text="subsample:")
     wcadre5.pack(side=LEFT)
-   
-   
-    
-    
-    clev = IntVar()
-    e = Entry(cadretop, textvariable=clev,width=5)
-    e.delete(0, END)
-    e.insert(0, "1")
-    e.pack(fill='x',side=LEFT)
+    clev5 = IntVar()
+    e5 = Entry(cadretop, textvariable=clev5,width=5)
+    e5.delete(0, END)
+    e5.insert(0, str(varglobal[3]))
+    e5.pack(fill='x',side=LEFT)
+    wcadresep = Label(cadretop, text=" | ",bg='purple')
+    wcadresep.pack(side=LEFT)  
+
+    wcadre6 = Label(cadretop, text="patch ovelapp [0-1]:")
+    wcadre6.pack(side=LEFT)    
+    clev6 = DoubleVar()
+    e6 = Entry(cadretop, textvariable=clev6,width=5)
+    e6.delete(0, END)
+    e6.insert(0, str(varglobal[0]))    
+    e6.pack(fill='x',side=LEFT)
+    wcadresep = Label(cadretop, text=" | ",bg='purple')
+    wcadresep.pack(side=LEFT) 
+
+    wcadre7 = Label(cadretop, text="predict proba acceptance[0-1]:")
+    wcadre7.pack(side=LEFT)
+    clev7 = DoubleVar()
+    e7 = Entry(cadretop, textvariable=clev7,width=5)
+    e7.delete(0, END)
+    e7.insert(0, str(varglobal[1]))
+    e7.pack(fill='x',side=LEFT)
+    wcadresep = Label(cadretop, text=" | ",bg='purple')   
+    wcadresep.pack(side=LEFT)
     
     retour0=IntVar(cadretop)
     bouton0 = Radiobutton(cadretop, text='run predict',variable=retour0,value=1,bd=2)
     bouton1 = Radiobutton(cadretop, text='visu only',variable=retour0,value=0,bd=2)
+    if runalready:
+            bouton1.pack(side=RIGHT)
     bouton0.pack(side=RIGHT)
-    bouton1.pack(side=RIGHT)
     bouton_run = Button(cadretop, text="Run", bg='green',fg='blue',\
-             command= lambda: runpredict(clepp.get(),clev.get(),retour0.get()))
+             command= lambda: runpredict(clepp.get(),clev5.get(),clev6.get(),clev7.get(),retour0.get()))
     bouton_run.pack(side=RIGHT)
 #    separator = Frame(cadretop,height=2, bd=10, relief=SUNKEN)
 #    separator.pack(fill=X, padx=5, pady=2)
@@ -1584,23 +1672,24 @@ imgtext = np.zeros((512,512,3), np.uint8)
 
 fenetre = Tk()
 fenetre.title("predict")
-fenetre.geometry("610x800+100+50")
+fenetre.geometry("700x800+100+50")
 
 
 
-cadretop = LabelFrame(fenetre, width=600, height=100, text='top',borderwidth=5,bg="purple",fg='yellow')
-cadretop.grid(row=0)
-cadrestatus = LabelFrame(fenetre,width=600, height=20,text="status run",bg='purple',fg='yellow')
-cadrestatus.grid(row=1)
-cadrerun = LabelFrame(fenetre,text="select a patient",width=600, height=20,fg='yellow',bg='purple')
-cadrerun.grid(row=2)
-cadrepn = LabelFrame(fenetre,text="patient name list:",width=600, height=20,bg='purple',fg='yellow')
-cadrepn.grid(row=3)
-cadrestat=LabelFrame(fenetre,text="statistic", width=300,height=20,fg='yellow',bg='purple')
+cadretop = LabelFrame(fenetre, width=700, height=100, text='top',borderwidth=5,bg="purple",fg='yellow')
+cadretop.grid(row=0,sticky=NW)
+cadrestatus = LabelFrame(fenetre,width=700, height=20,text="status run",bg='purple',fg='yellow')
+cadrestatus.grid(row=1,sticky=NW)
+cadrerun = LabelFrame(fenetre,text="select a patient",width=700, height=20,fg='yellow',bg='purple')
+cadrerun.grid(row=2,sticky=NW)
+cadrepn = LabelFrame(fenetre,text="patient name list:",width=700, height=20,bg='purple',fg='yellow')
+cadrepn.grid(row=3,sticky=NW)
+cadrestat=LabelFrame(fenetre,text="statistic", width=350,height=20,fg='yellow',bg='purple')
 cadrestat.grid(row=4,  sticky=NW )
-cadreim=LabelFrame(fenetre,text="images", width=300,height=20,fg='yellow',bg='purple')
+cadreim=LabelFrame(fenetre,text="images", width=350,height=20,fg='yellow',bg='purple')
 cadreim.grid(row=4,  sticky=E)
-
+    
+#setva()
 runl()
 
 patch_list=[]
