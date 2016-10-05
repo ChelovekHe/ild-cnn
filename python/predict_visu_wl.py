@@ -39,6 +39,15 @@ instdir=os.path.join(os.environ['LOCALAPPDATA'],instdirMHK)
 
 
 #########################################################
+
+#patch size in pixels 32 * 32
+dimpavx =32
+dimpavy = 32
+
+#patch size in pixels for lung 32 * 32
+lungdimpavx =15
+lungdimpavy = 15
+
 # with or without bg (true if with back_ground)
 wbg=True
 #to enhance contrast on patch put True
@@ -49,18 +58,21 @@ vbg='A'
 thrpatch = 0.9
 #threshold for probability prediction
 thrproba = 0.5
-#threshold for lung acceptance
-thrlung=0.5
+
+#probability for lung acceptance
+thrlung=0.7
 
 #subsample by default
 subsdef=10
 #normalization internal procedure or openCV
-normiInternal=True
+normiInternal=False
 
+# average pxixel spacing
+avgPixelSpacing=0.734
 #workingdirectory='C:\Users\sylvain\Documents\boulot\startup\radiology\PREDICT'
 #installdirectory='C:\Users\sylvain\Documents\boulot\startup\radiology\UIP\python'
 #global directory for predict file
-namedirtop = 'predict_e'
+namedirtop = 'predict_essai'
 
 #directory for storing image out after prediction
 predictout='predicted_results'
@@ -90,10 +102,12 @@ lungXrefpkl='lung_X_file_reference.pkl'
 subsamplef='subsample.pkl'
 
 #subdirectory name to colect pkl files for prediction
-picklefile='pickle_sk32'
+#picklefile='pickle_sk32'
+picklefile='pickle_ex11'
+
 
 #subdirectory name to colect pkl filesfor lung  prediction
-picklefilelung='pickle_s5_lung'
+picklefilelung='pickle_sk7_lung'
 
 
 
@@ -109,16 +123,8 @@ datahealthy=['138']
 typei='bmp' 
 
 #dicom file size in pixels
-dimtabx = 512
-dimtaby = 512
-
-#patch size in pixels 32 * 32
-dimpavx =32
-dimpavy = 32
-
-#patch size in pixels for lung 32 * 32
-lungdimpavx =15
-lungdimpavy = 15
+#dimtabx = 512
+#dimtaby = 512
 
 
 #########################################################################
@@ -128,7 +134,7 @@ path_patient = os.path.join(workingdir,namedirtop)
 varglobal=(thrpatch,thrproba,path_patient,subsdef)
 
 def setva():
-        global varglobal,thrlung,thrpatch,subsdef,path_patient
+        global varglobal,thrproba,thrpatch,subsdef,path_patient
         if not os.path.exists(glovalf) :
             pickle.dump(varglobal, open( glovalf, "wb" ))
         else:
@@ -139,7 +145,7 @@ def setva():
 #            print varglobal
             path_patient=varglobal[2]
 #            print path_patient
-            thrlung=varglobal[1]
+            thrproba=varglobal[1]
             thrpatch=varglobal[0]
             subsdef=varglobal[3]
 
@@ -151,9 +157,9 @@ def newva():
 
 (cwdtop,tail)=os.path.split(cwd)
 
-if not os.path.exists(path_patient):
-    print 'patient directory does not exists'
-    sys.exit()
+#if not os.path.exists(path_patient):
+#    print 'patient directory does not exists'
+#    sys.exit()
 
 setva()   
 picklein_file = os.path.join(instdir,picklefile)
@@ -228,7 +234,7 @@ if wbg :
     classif ={
 'back_ground':0,
 'consolidation':1,
-'fibrosis':2,
+'HC':2,
 'ground_glass':3,
 'healthy':4,
 'micronodules':5,
@@ -250,7 +256,7 @@ if wbg :
 else:
       classif ={
     'consolidation':0,
-    'fibrosis':1,
+    'HC':1,
     'ground_glass':2,
     'healthy':3,
     'micronodules':4,
@@ -276,7 +282,7 @@ else:
 classifc ={
 'back_ground':darkgreen,
 'consolidation':red,
-'fibrosis':blue,
+'HC':blue,
 'ground_glass':yellow,
 'healthy':green,
 'micronodules':cyan,
@@ -306,6 +312,7 @@ def remove_folder(path):
    
 def genebmp(dirName,fn,subs):
     """generate patches from dicom files"""
+    global dimtabx, dimtaby
 #    print ('load dicom files in :',dirName, 'scan name:',fn)
     #directory for patches
     bmp_dir = os.path.join(dirName, scanbmp)
@@ -313,6 +320,10 @@ def genebmp(dirName,fn,subs):
     FilesDCM =(os.path.join(dirName,fn))  
 #           
     ds = dicom.read_file(FilesDCM)
+#    constPixelSpacing=(float(ds.PixelSpacing[0]), float(ds.PixelSpacing[1]), float(ds.SliceThickness))
+    fxs=float(ds.PixelSpacing[0])/avgPixelSpacing
+    fys=float(ds.PixelSpacing[1])/avgPixelSpacing
+   
     endnumslice=fn.find('.dcm')
     imgcore=fn[0:endnumslice]+'.'+typei
    
@@ -323,8 +334,20 @@ def genebmp(dirName,fn,subs):
     slicenumber=int(fn[debnumslice:endnumslice])
 
     bmpfile=os.path.join(bmp_dir,imgcore)
+    
     scipy.misc.imsave(bmpfile, ds.pixel_array)
-
+    imgor=cv2.imread(bmpfile)
+    imgresize=cv2.resize(imgor,None,fx=fxs,fy=fys,interpolation=cv2.INTER_LINEAR)
+    cv2.imwrite(bmpfile,imgresize)
+#    imretrieve=cv2.imread(bmpfile,0)
+#    print 'imretrieve',imretrieve.shape,imretrieve.dtype
+#    print imretrieve[0][0]
+#    print imretrieve[292][148]
+#    print imretrieve[356][256]
+#    print imretrieve[244][451]
+    dimtabx=imgresize.shape[0]
+    dimtaby=imgresize.shape[1]
+#    print dimtabx
     lung_dir = os.path.join(dirName, lungmask)
     
     lung_bmp_dir = os.path.join(lung_dir,lungmaskbmp)
@@ -351,6 +374,11 @@ def genebmp(dirName,fn,subs):
 
                             lungcoref=os.path.join(lung_bmp_dir,imgcorescan)
                             scipy.misc.imsave(lungcoref, dslung.pixel_array)
+                            lungr=cv2.imread(lungcoref)
+                            lungresize=cv2.resize(lungr,None,fx=fxs,fy=fys,interpolation=cv2.INTER_LINEAR)
+#            bmpfiler=os.path.join(bmp_dir,imgcore)
+                            cv2.imwrite(lungcoref,lungresize)                          
+                            
                             break
 #                        else:
 #                            generatelungmask(dirName,imgcore,slicenumber)
@@ -369,7 +397,7 @@ def normi(img):
 
 def lungpredict(dn,nd,sln):
 #        print('predict lung  on: ',nd, 'slice:',sln, 'directory:',dn)
-        print('predict lung  on: ',nd, 'slice:',sln)
+#        print('predict lung  on: ',nd, 'slice:',sln)
 
         global patch_list_lung
         dataset_list_lung=[]
@@ -456,12 +484,18 @@ def pavgenelung(dn,nd,sln):
                     if imagemax!=None and min_val!=max_val:                                  
                                                     
                         if contrast:
-                                if normiInternal:
-                                    tabcont=normi(crorig)
-                                else:
-                                    npcrorig =np.array(crorig)
-                                    tabcont = cv2.equalizeHist(npcrorig)
-                                patch_list_lung.append((dptail,sln,i,j,tabcont))
+                            
+                            imgra =np.array(crorig)
+                            imgray = cv2.cvtColor(imgra,cv2.COLOR_BGR2GRAY)
+                                
+                            tabi2 = cv2.equalizeHist(imgray)                                        
+#                            scipy.misc.imsave(patchNormpath+nampa, tabi2)                            
+#                            
+#                            
+#                            
+#                            npcrorig =np.array(crorig)
+#                            tabcont = cv2.equalizeHist(npcrorig)
+                            patch_list_lung.append((dptail,sln,i,j,tabi2))
 #                                    n+=1
                         else:
                             patch_list_lung.append((dptail,sln,i,j,crorig))
@@ -524,9 +558,9 @@ def  genelung(dn,nd,sln):
     imscan = ImagePIL.open(imgc)
     imscanc= imscan.convert('RGB')
     tablscan = np.array(imscanc)
-    if imscan.size[0]>512:
-        ncr=imscanc.resize((dimtabx,dimtaby),PIL.Image.ANTIALIAS)
-        tablscan = np.array(ncr) 
+#    if imscan.size[0]>512:
+#        ncr=imscanc.resize((dimtabx,dimtaby),PIL.Image.ANTIALIAS)
+#        tablscan = np.array(ncr) 
     ill = 0
               
 #                foundp=False
@@ -547,16 +581,31 @@ def  genelung(dn,nd,sln):
                                 imgt=cv2.add(imgt,imgi)
         
                     ill+=1
-#    cv2.imshow('image',imgt) 
-#    cv2.waitKey(0)
+  
+
     predscan=cv2.add(tablscan,imgt)
+    #15
     kernele=np.ones((16,16),np.uint8)
     kernelc=np.ones((3,3),np.uint8)
     kerneld=np.ones((19,19),np.uint8)
+    #32
+#    kernele=np.ones((33,33),np.uint8)   
+#    kernelc=np.ones((3,3),np.uint8)   
+#    kerneld=np.ones((33,33),np.uint8)
+
         
     erosion = cv2.erode(imgt,kernele,iterations = 1)             
     opening = cv2.morphologyEx(erosion, cv2.MORPH_OPEN, kernelc)                
     dilation = cv2.dilate(opening,kerneld,iterations = 1)
+    cv2.imshow('image',imgt) 
+    cv2.imshow('imageo',tablscan) 
+    cv2.imshow('erosion',erosion) 
+
+    cv2.imshow('opening',opening) 
+
+    cv2.imshow('dilatation',dilation) 
+    cv2.waitKey(0)    
+    cv2.destroyAllWindows()
     
     imgcorefull=imgcore+'.bmp'
     imgname=os.path.join(predictout_dir,'lung_'+imgcorefull)    
@@ -566,11 +615,12 @@ def  genelung(dn,nd,sln):
     imgnamelung=os.path.join(lung_dir_bmp,lungname)
 #    print imgname
     cv2.imwrite(imgname,predscan)
+#    cv2.imwrite(imgnamelung,imgt)
     cv2.imwrite(imgnamelung,dilation)
 
 
 def generatelungmask(dn,nd,sln):
-#     print'generate lung mask',' top:',dn,' slicename:',nd,' slicenumber:',  sln
+     print'generate lung mask',' top:',dn,' slicename:',nd,' slicenumber:',  sln
      """ generate lung mask"""
      global patch_list_lung,classdirec
 #     print('generate patches on: ',nd, 'slice:',sln) 
@@ -640,6 +690,7 @@ def pavgene (namedirtopcf):
                 ymax=0
                 
              i=xmin
+#             print xmin,xmax,ymin,ymax
              while i <= xmax:
                  j=ymin
         #        j=maxj
@@ -650,22 +701,52 @@ def pavgene (namedirtopcf):
         
 #                    check if area above threshold
                      targ=float(area)/pxy
+#                     if i==156and j==403:
+#                         print i,j,tabpatch[0]
+#                         print area, pxy
 #                     print area, pxy
                      if targ>thrpatch:
-#                        print area, pxy
-                        crorig = im.crop((i, j, i+dimpavx, j+dimpavy))
-                        imagemax=crorig.getbbox()
-        #               detect black patch
-        #                print (imagemax)
-                        if imagemax!=None:
+#                        if i==171 and j==323:
+#                            print i,j,area, pxy
+#                        crorig = im.crop((i, j, i+dimpavx, j+dimpavy))
+                        crorig = tabf[j:j+dimpavy,i:i+dimpavx]
+                        imgra =np.array(crorig)
+                        imgray = cv2.cvtColor(imgra,cv2.COLOR_BGR2GRAY)
+#                        if i==171 and j==323:
+#                         print i,j,imgray
+#                        imagemax=imgra.getbbox()
+#        #               detect black patch
+#        #                print (imagemax)
+#                        if imagemax!=None:
+                        imagemax= cv2.countNonZero(imgray)
+                        min_val, max_val, min_loc,max_loc = cv2.minMaxLoc(imgray)
+             
+                        if imagemax > 0 and min_val != max_val:
 #                            namepatch=patchpathf+'/p_'+str(slicenumber)+'_'+str(i)+'_'+str(j)+'.'+typei
                             if contrast:
                                     if normiInternal:
-                                        tabcont=normi(crorig)
+                                        tabi2=normi(crorig)
                                     else:
-                                        npcrorig =np.array(crorig)
-                                        tabcont = cv2.equalizeHist(npcrorig)
-                                    patch_list.append((dptail,slicenumber,i,j,tabcont))
+                                        
+                                        
+#                                        imgra =np.array(crorig)
+#                                        
+#                                        imgray = cv2.cvtColor(imgra,cv2.COLOR_BGR2GRAY)
+#                                        if i==171 and j==323:
+#                                            print i,j,imgray
+                                        tabi2 = cv2.equalizeHist(imgray)
+#                                        if i==156 and j==295:
+#                                            print i,j,tabi2
+#                                        if i==156:
+#                                                print i,j,tabi2[0]                                           
+                                        
+                                        
+                                        
+#                                        
+#                                        
+#                                        npcrorig =np.array(crorig)
+#                                        tabcont = cv2.equalizeHist(npcrorig)
+                                    patch_list.append((dptail,slicenumber,i,j,tabi2))
 #                                    n+=1
                             else:
                                 patch_list.append((dptail,slicenumber,i,j,crorig))
@@ -675,7 +756,8 @@ def pavgene (namedirtopcf):
                             while x < dimpavx:
                                 y=0
                                 while y < dimpavy:
-                                    tabf[y+j][x+i]=[255,0,0]
+                                    if y+j<dimtaby and x+i<dimtabx:
+                                        tabf[y+j][x+i]=[255,0,0]
                                     if x == 0 or x == dimpavx-1 :
                                         y+=1
                                     else:
@@ -701,7 +783,9 @@ def ILDCNNpredict(patient_dir_s):
                 nameset_list.append(fil[0:3])
         
         X = np.array(dataset_list)
-#        print X[1].shape
+        print X.shape
+        X0= X.shape[0]
+#        print X0
         X_predict = np.asarray(np.expand_dims(X,1))/float(255)        
         
         jsonf= os.path.join(picklein_file,'ILD_CNN_model.json')
@@ -731,13 +815,17 @@ def ILDCNNpredict(patient_dir_s):
         model.load_weights(weigf)
 
         model.compile(optimizer='Adam', loss=CNN4.get_Obj(train_params['obj']))        
-
-        proba = model.predict_proba(X_predict, batch_size=100)
-        picklefileout_f_dir = os.path.join( patient_dir_s,picklefile)
+             
+        if X0>0:
+            proba = model.predict_proba(X_predict, batch_size=100)
+        else:
+            proba=()
+        picklefileout_f_dir = os.path.join( patient_dir_s,picklefile)     
         xfp=os.path.join(picklefileout_f_dir,Xprepkl)
         pickle.dump(proba, open( xfp, "wb" ))
         xfpr=os.path.join(picklefileout_f_dir,Xrefpkl)
         pickle.dump(patch_list, open( xfpr, "wb" ))
+#        print proba[0]
 
 
 def fidclass(numero,classn):
@@ -781,7 +869,7 @@ def tagviews(b,fig,t0,x0,y0,t1,x1,y1,t2,x2,y2,t3,x3,y3,t4,x4,y4):
     draw = ImageDraw.Draw(imgn)
     if b:
         draw.rectangle ([x1, y1,x1+100, y1+15],outline='black',fill='black')
-        draw.rectangle ([140, 0,512,75],outline='black',fill='black')
+        draw.rectangle ([140, 0,dimtabx,75],outline='black',fill='black')
     draw.text((x0, y0),t0,white,font=font10)
     draw.text((x1, y1),t1,white,font=font10)
     draw.text((x2, y2),t2,white,font=font10)
@@ -946,12 +1034,14 @@ def  visua(dirpatientdb,cla,wra):
             posend-=1
         debnumslice=posend+1
         slicenumber=int((img[debnumslice:endnumslice])) 
-        imscan = ImagePIL.open(imgc)
-        imscanc= imscan.convert('RGB')
-        tablscan = np.array(imscanc)
-        if imscan.size[0]>512:
-            ncr=imscanc.resize((dimtabx,dimtaby),PIL.Image.ANTIALIAS)
-            tablscan = np.array(ncr) 
+        tablscan=cv2.imread(imgc,1)
+#        tablscan = cv2.cvtColor(tablscan, cv2.COLOR_BGR2RGB)
+#        imscan = ImagePIL.open(imgc)
+#        imscanc= imscan.convert('RGB')
+#        tablscan = np.array(imscanc)
+#        if imscan.size[0]>512:
+#            ncr=imscanc.resize((dimtabx,dimtaby),PIL.Image.ANTIALIAS)
+#            tablscan = np.array(ncr) 
         ill = 0
       
         foundp=False
@@ -1006,14 +1096,19 @@ def  visua(dirpatientdb,cla,wra):
             imgnamebv=os.path.join(predictout_dir_bv,imgcorefull)
     #        print 'imgname',imgname    
             cv2.imwrite(imgnamebv,tablscan)
+            tablscan = cv2.cvtColor(tablscan, cv2.COLOR_BGR2RGB)
+
             vis=drawContour(imgt,listlabel)
-#        print tablscan.shape
+#            vis = cv2.cvtColor(vis, cv2.COLOR_BGR2RGB)
+
 #put to zero the contour in image in order to get full visibility of contours
             img2gray = cv2.cvtColor(vis,cv2.COLOR_BGR2GRAY)
             ret, mask = cv2.threshold(img2gray, 10, 255, cv2.THRESH_BINARY)
             mask_inv = cv2.bitwise_not(mask)
+            
             img1_bg = cv2.bitwise_and(tablscan,tablscan,mask = mask_inv)  
-#superimpose scan and contours           
+#superimpose scan and contours      
+#            print img1_bg.shape, vis.shape
             imn=cv2.add(img1_bg,vis)
 
 
@@ -1026,7 +1121,7 @@ def  visua(dirpatientdb,cla,wra):
                 errorfile.write('no recognised label in: '+str(topdir)+' '+str (img)+'\n' )
 
             imn = cv2.cvtColor(imn, cv2.COLOR_BGR2RGB)
-            cv2.imwrite(imgnamebv,tablscan)
+#            cv2.imwrite(imgnamebv,tablscan)
             cv2.imwrite(imgnameth,imn)            
             
        
@@ -1038,8 +1133,8 @@ def  visua(dirpatientdb,cla,wra):
             t2='CONFIDENTIAL - prototype - not for medical use'
             t3='For threshold: '+str(thrproba)+' :'
             t4=time.asctime()
-            tagviews(True,imgnamebv,t0,0,0,t1,0,20,t2,20,485,t3,0,38,t4,0,500)
-            tagviews(False,imgnameth,t0,0,0,t1,0,20,t2,20,485,t3,0,38,t4,0,500)
+            tagviews(True,imgnamebv,t0,0,0,t1,0,20,t2,20,dimtaby-27,t3,0,38,t4,0,dimtaby-10)
+            tagviews(False,imgnameth,t0,0,0,t1,0,20,t2,20,dimtaby-27,t3,0,38,t4,0,dimtaby-10)
 
         
             errorfile.write('\n'+'number of labels in :'+str(topdir)+' '+str(dptail)+str (img)+'\n' )
@@ -1086,7 +1181,7 @@ def dd(i):
 
 def nothings(x):
     global imgtext
-    imgtext = np.zeros((512,512,3), np.uint8)
+    imgtext = np.zeros((dimtabx,dimtaby,3), np.uint8)
     pass
 
 def nothing(x):
@@ -1121,7 +1216,7 @@ def draw_circle(event,x,y,flags,img):
        
         patchi=True
 #        print 'identification', ix,iy, patchi
-        if x>250 and x<270 and y>490 and y<510:
+        if x>250 and x<270 and y>dimtaby-30 and y<dimtaby-10:
             print 'quit'
             ix,iy=x,y
             quitl=True
@@ -1132,7 +1227,7 @@ def addpatchn(col,lab, xt,yt,imgn):
     return imgn
  
 def retrievepatch(x,y,top,sln,pr,li):
-    tabtext = np.zeros((512,512,3), np.uint8)
+    tabtext = np.zeros((dimtabx,dimtaby,3), np.uint8)
     ill=-1
     pfound=False
     for f in li:
@@ -1157,7 +1252,7 @@ def retrievepatch(x,y,top,sln,pr,li):
                          if proba[j]>0.01:
                              n=n+1
                              strw=fidclass(j,classif)+ ' {0:.1f}%'.format(100*proba[j])                             
-                             cv2.putText(tabtext,strw,(370,460+10*n),cv2.FONT_HERSHEY_PLAIN,0.8,(0,255,0),1)
+                             cv2.putText(tabtext,strw,(dimtabx-142,(dimtaby-60)+10*n),cv2.FONT_HERSHEY_PLAIN,0.8,(0,255,0),1)
                              
                              print fidclass(j,classif), ' {0:.2f}%'.format(100*proba[j])
                      print'found'
@@ -1168,7 +1263,7 @@ def retrievepatch(x,y,top,sln,pr,li):
     return tabtext
 
 def drawpatch(t,lp,preprob,k,top):
-    imgn = np.zeros((512,512,3), np.uint8)
+    imgn = np.zeros((dimtabx,dimtaby,3), np.uint8)
     ill = 0
     endnumslice=k.find('.bmp')
 
@@ -1242,8 +1337,8 @@ def openfichier(k,dirk,top,L):
 #    print 'openfichier', k, dirk,top,nseed
   
     global ix,iy,quitl,patchi,classdirec
-    global imgtext
-
+    global imgtext, dimtabx,dimtaby
+   
     patchi=False
     ix=0
     iy=0
@@ -1257,16 +1352,12 @@ def openfichier(k,dirk,top,L):
     else:
         ncf=ncf1
             
-
-#    subfile=os.path.join(dop,subsamplef)
-#    filesub=open(subfile,"r")
-#    fr=filesub.read()
-#    filesub.close()
-#    pnsub=fr.find(' ',0)
-#    nsub=fr[pnsub+1:len(fr)]
     subsample=varglobal[3]
     pdirk = os.path.join(dirk,k)
     img = cv2.imread(pdirk,1)
+    dimtabx= img.shape[0]
+    dimtaby= dimtabx
+    imgtext = np.zeros((dimtabx,dimtaby,3), np.uint8)
 #    print 'openfichier:',k , ncf, pdirk,top
     
     (preprob,listnamepatch)=loadpkl(ncf)      
@@ -1287,6 +1378,8 @@ def openfichier(k,dirk,top,L):
 
         img,pdirk= opennew(dirk, fl,L)
 #        print pdirk
+        
+        
         (topnew,tailnew)=os.path.split(pdirk)
         endnumslice=tailnew.find('.bmp',0)
         posend=endnumslice
@@ -1297,20 +1390,24 @@ def openfichier(k,dirk,top,L):
         
         imglumi=lumi(img,l)
         imcontrast=contrast(imglumi,c)        
-        
+        imcontrast=cv2.cvtColor(imcontrast,cv2.COLOR_BGR2RGB)
+#        print imcontrast.shape, imcontrast.dtype
         imgn=drawpatch(tl,listnamepatch,preprob,L[fl],top)
-
+#        imgn=cv2.cvtColor(imgn,cv2.COLOR_BGR2RGB)
         imgngray = cv2.cvtColor(imgn,cv2.COLOR_BGR2GRAY)
+#        print imgngray.shape, imgngray.dtype
         mask_inv = cv2.bitwise_not(imgngray)              
         outy=cv2.bitwise_and(imcontrast,imcontrast,mask=mask_inv)
         imgt=cv2.add(imgn,outy)
  
        
-        cv2.rectangle(imgt,(250,490),(270,510),red,-1)
-        cv2.putText(imgt,'quit',(260,500),cv2.FONT_HERSHEY_PLAIN,1,yellow,1,cv2.LINE_AA)
+        cv2.rectangle(imgt,(250,dimtaby-10),(270,dimtaby-30),red,-1)
+        cv2.putText(imgt,'quit',(260,dimtaby-10),cv2.FONT_HERSHEY_PLAIN,1,yellow,1,cv2.LINE_AA)
+        imgtoshow=cv2.add(imgt,imgtext)        
+        imgtoshow=cv2.cvtColor(imgtoshow,cv2.COLOR_BGR2RGB)
+
         
-        imgvisu=cv2.cvtColor(cv2.add(imgt,imgtext),cv2.COLOR_BGR2RGB)
-        cv2.imshow('image',imgvisu)
+        cv2.imshow('image',imgtoshow)
 
         if patchi :
             print 'retrieve patch asked'
@@ -1356,12 +1453,12 @@ def listbtn2(L,dirk,top):
     
 def opendir(k):
     global classdirec
-    
-    for widget in cadrepn.winfo_children():
-        widget.destroy()
+#    
+#    for widget in cadrepn.winfo_children():
+#        widget.destroy()
     for widget in cadrestat.winfo_children():
         widget.destroy()
-    Label(cadrepn, bg='lightgreen',text='patient:'+k).pack(side=TOP,fill=X,expand=1)
+    Label(cadrestat, bg='lightgreen',text='patient:'+k).pack(side=TOP,fill=X,expand=1)
     tow=''
     fdir=os.path.join(path_patient,k)
     if classdirec==1:   
@@ -1373,7 +1470,7 @@ def opendir(k):
              fdir = os.path.join(fdir, ll)
              bmp_dir = os.path.join(fdir, scanbmp)
     
-    separator = Frame(cadrepn,height=2, bd=10, relief=SUNKEN)
+    separator = Frame(cadrestat,height=2, bd=10, relief=SUNKEN)
     separator.pack(fill=X)
 #    print 'bmp dir', bmp_dir      
     listscanfile =os.listdir(bmp_dir)
@@ -1411,7 +1508,7 @@ def listbtn(L):
     for widget in cadrerun.winfo_children():       
                 widget.destroy()    
     for k in L:
-            Button(cadrerun,text=k,command=lambda k = k: opendir(k)).pack(side=TOP,fill="both",\
+            Button(cadrerun,text=k,command=lambda k = k: opendir(k)).pack(side=LEFT,fill="both",\
             expand=1)
 
 def runf():
@@ -1429,19 +1526,22 @@ def quit():
     fenetre.quit()
     fenetre.destroy()   
 
-def runpredict(pp,subs,thrp, thproba,retou):
+def runpredict(pp,subs,thrp, thpro,retou):
     
     global classdirec,path_patient, patch_list, \
            dataset_list, nameset_list, proba,subsdef,varglobal,thrproba
     for widget in cadretop.winfo_children():       
                 widget.destroy()    
-    
+    for widget in cadrelistpatient.winfo_children():
+               widget.destroy()
+    for widget in cadreparam.winfo_children():
+               widget.destroy()
 #    cadrestatus.grid(row=1)
     
     cw = Label(cadrestatus, text="Running",fg='red',bg='blue')
     cw.pack(side=TOP,fill=X)
     thrpatch=thrp
-    thrproba=thproba
+    thrproba=thpro
     subsdef =subs
     path_patient=pp
     varglobal=(thrpatch,thrproba,path_patient,subsdef)  
@@ -1527,6 +1627,7 @@ def runpredict(pp,subs,thrp, thproba,retou):
                         scanfile=ldcm[scanumber]          
                         genebmp(namedirtopcf,scanfile,subs)
             
+                                
                 pavgene(namedirtopcf)
                 ILDCNNpredict(namedirtopcf)
                 visua(namedirtopcf,classdirec,True)   
@@ -1555,6 +1656,10 @@ def runpredict(pp,subs,thrp, thproba,retou):
 
 
 def runl1 ():
+    for widget in cadrelistpatient.winfo_children():
+               widget.destroy()
+    for widget in cadreparam.winfo_children():
+               widget.destroy()
     for widget in cadrestatus.winfo_children():
                 widget.destroy()
     for widget in cadretop.winfo_children():
@@ -1565,9 +1670,35 @@ def runl1 ():
                 widget.destroy()
     for widget in cadreim.winfo_children():
                 widget.destroy()
-    for widget in cadrepn.winfo_children():
-                widget.destroy()
+#    for widget in cadrepn.winfo_children():
+#                widget.destroy()
     runl()
+
+def chp(newp):
+    global varglobal
+    varglobal=(thrpatch,thrproba,newp,subsdef)
+    for widget in cadrelistpatient.winfo_children():
+               widget.destroy()
+    for widget in cadreparam.winfo_children():
+               widget.destroy()
+    for widget in cadrestatus.winfo_children():
+                widget.destroy()
+    for widget in cadretop.winfo_children():
+                widget.destroy()
+    for widget in cadrerun.winfo_children():
+                widget.destroy()
+    for widget in cadrestat.winfo_children():
+                widget.destroy()
+    for widget in cadreim.winfo_children():
+                widget.destroy()
+#    for widget in cadrepn.winfo_children():
+#                widget.destroy()
+   
+#    print varglobal
+    runl()
+
+
+
 
 def runl ():
     global path_patient,varglobal
@@ -1578,79 +1709,97 @@ def runl ():
     separator = Frame(cadretop,height=2, bd=10, relief=SUNKEN)
     separator.pack(fill=X)
     w = Label(cadretop, text="path for patients:")
-    w.pack(side=TOP,fill='both')
+    w.pack(side=LEFT,fill='both')
     
     clepp = StringVar()
-    e = Entry(cadretop, textvariable=clepp,width=98)
+    e = Entry(cadretop, textvariable=clepp,width=80)
     e.delete(0, END)
     e.insert(0, varglobal[2])
 #    e.insert(0, workingdir)
-    e.pack(side=TOP,fill='both',expand=1)
+    e.pack(side=LEFT,fill='both',expand=1)
+    boutonp = Button(cadretop, text='change patient dir',command= lambda : chp(clepp.get()),bg='green',fg='blue')
+    boutonp.pack(side=LEFT)
 ##   
-    if os.path.exists(path_patient):
-        pl=os.listdir(path_patient)
-        ll = Label(cadretop, text='list of patient(s):')
+#    print varglobal
+    if os.path.exists(varglobal[2]):
+        pl=os.listdir(varglobal[2])
+        ll = Label(cadrelistpatient, text='list of patient(s):')
         ll.pack()
         tow=''
         for l in pl:
-            ld=os.path.join(path_patient,l)
+            ld=os.path.join(varglobal[2],l)
             if os.path.isdir(ld):
                 tow =tow+l+' - '
                 pdir=os.path.join(ld,picklefile)
-            ll = Label(cadretop, text=tow,fg='blue')
+                if os.path.exists(pdir):
+                    runalready=True
+                else:
+                    psp=os.listdir(ld)
+                    for ll in psp:
+                        if ll.find('.dcm')<0:
+                            pdir1=os.path.join(ld,ll)
+                            pdir=os.path.join(pdir1,picklefile)
+                            if os.path.exists(pdir):
+                                runalready=True
+                            
+            ll = Label(cadrelistpatient, text=tow,fg='blue')
             
         ll.pack(side =TOP)
-        print pdir
-        if os.path.exists(pdir):
-            runalready=True
+       
              
 
     else:     
-        ll = Label(cadretop, text='path_patient does not exist:',fg='red',bg='yellow')
+        print 'do not exist'
+        ll = Label(cadrelistpatient, text='path_patient does not exist:',fg='red',bg='yellow')
         ll.pack()
 
-    separator = Frame(cadretop,height=2, bd=10, relief=SUNKEN)
+    separator = Frame(cadrelistpatient,height=2, bd=10, relief=SUNKEN)
     separator.pack(fill=X)
 
-    wcadre5 = Label(cadretop, text="subsample:")
+    wcadre5 = Label(cadreparam, text="subsample:")
     wcadre5.pack(side=LEFT)
     clev5 = IntVar()
-    e5 = Entry(cadretop, textvariable=clev5,width=5)
+    e5 = Entry(cadreparam, textvariable=clev5,width=5)
     e5.delete(0, END)
     e5.insert(0, str(varglobal[3]))
     e5.pack(fill='x',side=LEFT)
-    wcadresep = Label(cadretop, text=" | ",bg='purple')
+    wcadresep = Label(cadreparam, text=" | ",bg='purple')
     wcadresep.pack(side=LEFT)  
 
-    wcadre6 = Label(cadretop, text="patch ovelapp [0-1]:")
+    wcadre6 = Label(cadreparam, text="patch ovelapp [0-1]:")
     wcadre6.pack(side=LEFT)    
     clev6 = DoubleVar()
-    e6 = Entry(cadretop, textvariable=clev6,width=5)
+    e6 = Entry(cadreparam, textvariable=clev6,width=5)
     e6.delete(0, END)
     e6.insert(0, str(varglobal[0]))    
     e6.pack(fill='x',side=LEFT)
-    wcadresep = Label(cadretop, text=" | ",bg='purple')
+    wcadresep = Label(cadreparam, text=" | ",bg='purple')
     wcadresep.pack(side=LEFT) 
 
-    wcadre7 = Label(cadretop, text="predict proba acceptance[0-1]:")
+    wcadre7 = Label(cadreparam, text="predict proba acceptance[0-1]:")
     wcadre7.pack(side=LEFT)
     clev7 = DoubleVar()
-    e7 = Entry(cadretop, textvariable=clev7,width=5)
+    e7 = Entry(cadreparam, textvariable=clev7,width=5)
     e7.delete(0, END)
     e7.insert(0, str(varglobal[1]))
     e7.pack(fill='x',side=LEFT)
-    wcadresep = Label(cadretop, text=" | ",bg='purple')   
+    wcadresep = Label(cadreparam, text=" | ",bg='purple')   
     wcadresep.pack(side=LEFT)
     
-    retour0=IntVar(cadretop)
-    bouton0 = Radiobutton(cadretop, text='run predict',variable=retour0,value=1,bd=2)
-    bouton1 = Radiobutton(cadretop, text='visu only',variable=retour0,value=0,bd=2)
+#    retour0=IntVar(cadreparam)
+#    bouton0 = Radiobutton(cadreparam, text='run predict',variable=retour0,value=1,bd=2)
+#    bouton0.pack(side=RIGHT)
+#    if runalready:
+#         bouton1 = Radiobutton(cadreparam, text='visu only',variable=retour0,value=0,bd=2)
+#         bouton1.pack(side=RIGHT)
+#    print runalready
     if runalready:
-            bouton1.pack(side=RIGHT)
-    bouton0.pack(side=RIGHT)
-    bouton_run = Button(cadretop, text="Run", bg='green',fg='blue',\
-             command= lambda: runpredict(clepp.get(),clev5.get(),clev6.get(),clev7.get(),retour0.get()))
-    bouton_run.pack(side=RIGHT)
+       bouton_run1 = Button(cadreparam, text="Run visu", bg='green',fg='blue',\
+             command= lambda: runpredict(clepp.get(),clev5.get(),clev6.get(),clev7.get(),0))
+       bouton_run1.pack(side=RIGHT)
+    bouton_run2 = Button(cadreparam, text="Run predict", bg='green',fg='blue',\
+             command= lambda: runpredict(clepp.get(),clev5.get(),clev6.get(),clev7.get(),1))
+    bouton_run2.pack(side=RIGHT)
 #    separator = Frame(cadretop,height=2, bd=10, relief=SUNKEN)
 #    separator.pack(fill=X, padx=5, pady=2)
 
@@ -1668,7 +1817,7 @@ quitl=False
 patchi=False
 listelabelfinal={}
 oldc=0
-imgtext = np.zeros((512,512,3), np.uint8)
+#imgtext = np.zeros((dimtabx,dimtaby,3), np.uint8)
 
 fenetre = Tk()
 fenetre.title("predict")
@@ -1676,18 +1825,22 @@ fenetre.geometry("700x800+100+50")
 
 
 
-cadretop = LabelFrame(fenetre, width=700, height=100, text='top',borderwidth=5,bg="purple",fg='yellow')
+cadretop = LabelFrame(fenetre, width=700, height=20, text='top',borderwidth=5,bg="purple",fg='yellow')
 cadretop.grid(row=0,sticky=NW)
+cadrelistpatient = LabelFrame(fenetre, width=700, height=20, text='list',borderwidth=5,bg="purple",fg='yellow')
+cadrelistpatient.grid(row=1,sticky=NW)
+cadreparam = LabelFrame(fenetre, width=700, height=20, text='param',borderwidth=5,bg="purple",fg='yellow')
+cadreparam.grid(row=2,sticky=NW)
 cadrestatus = LabelFrame(fenetre,width=700, height=20,text="status run",bg='purple',fg='yellow')
-cadrestatus.grid(row=1,sticky=NW)
+cadrestatus.grid(row=3,sticky=NW)
 cadrerun = LabelFrame(fenetre,text="select a patient",width=700, height=20,fg='yellow',bg='purple')
-cadrerun.grid(row=2,sticky=NW)
-cadrepn = LabelFrame(fenetre,text="patient name list:",width=700, height=20,bg='purple',fg='yellow')
-cadrepn.grid(row=3,sticky=NW)
+cadrerun.grid(row=4,sticky=NW)
+#cadrepn = LabelFrame(fenetre,text="patient name list:",width=700, height=20,bg='purple',fg='yellow')
+#cadrepn.grid(row=5,sticky=NW)
 cadrestat=LabelFrame(fenetre,text="statistic", width=350,height=20,fg='yellow',bg='purple')
-cadrestat.grid(row=4,  sticky=NW )
+cadrestat.grid(row=6,  sticky=NW )
 cadreim=LabelFrame(fenetre,text="images", width=350,height=20,fg='yellow',bg='purple')
-cadreim.grid(row=4,  sticky=E)
+cadreim.grid(row=6,  sticky=E)
     
 #setva()
 runl()
