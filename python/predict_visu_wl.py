@@ -37,21 +37,56 @@ instdir=os.path.join(os.environ['LOCALAPPDATA'],instdirMHK)
 #print 'instdir', instdir
 #print 'workdir', workingfull
 
-
+#define the pattern set
+pset=0
 #########################################################
+if pset==2:
+    #picklefile    'HC', 'micronodules'
+    picklefile='pickle_ex22'
+    #patch size in pixels 32 * 32
+    dimpavx =16 
+    dimpavy = 16
 
-#patch size in pixels 32 * 32
-dimpavx =32
-dimpavy = 32
+elif pset==0:
+    #picklefile 'consolidation', 'HC','ground_glass', 'micronodules', 'reticulation'
+    picklefile='pickle_ex17'
+#    #patch size in pixels 32 * 32
+    dimpavx =28 
+    dimpavy = 28
+#    picklefile='pickle_ex18'
+###    #patch size in pixels 32 * 32
+#    dimpavx =24
+#    dimpavy = 24
+    
+elif pset==1:
+    #    'consolidation', 'ground_glass',
+    picklefile='pickle_ex17'
+    #patch size in pixels 32 * 32
+    dimpavx =28 
+    dimpavy = 28
+    
+#Lung files    
+#subdirectory name to colect pkl filesfor lung  prediction
+picklefilelung='pickle_sk8_lung'
+#to enhance contrast on patch put True
+contrastScanLung=False
+#normalization internal procedure or openCV
+normiInternalLung=False
 
 #patch size in pixels for lung 32 * 32
 lungdimpavx =15
 lungdimpavy = 15
+#probability for lung acceptance
+thrlung=0.7
 
+#########################################################
 # with or without bg (true if with back_ground)
 wbg=True
 #to enhance contrast on patch put True
-contrast=True
+contrastScan=True
+#normalization internal procedure or openCV
+normiInternal=True
+
 #path for visua back-ground
 vbg='A'
 #threshold for patch acceptance overlapp
@@ -59,13 +94,11 @@ thrpatch = 0.9
 #threshold for probability prediction
 thrproba = 0.5
 
-#probability for lung acceptance
-thrlung=0.7
+
 
 #subsample by default
 subsdef=10
-#normalization internal procedure or openCV
-normiInternal=False
+
 
 # average pxixel spacing
 avgPixelSpacing=0.734
@@ -102,12 +135,7 @@ lungXrefpkl='lung_X_file_reference.pkl'
 subsamplef='subsample.pkl'
 
 #subdirectory name to colect pkl files for prediction
-#picklefile='pickle_sk32'
-picklefile='pickle_ex11'
 
-
-#subdirectory name to colect pkl filesfor lung  prediction
-picklefilelung='pickle_sk7_lung'
 
 
 
@@ -128,6 +156,13 @@ typei='bmp'
 
 
 #########################################################################
+if contrastScan:
+    if normiInternal:
+        print 'Internal contrast enabled'
+    else:
+        print 'openCv contrast enabled'
+else:
+        print 'no contrast'
 cwd=os.getcwd()
 glovalf=tempofile
 path_patient = os.path.join(workingdir,namedirtop)
@@ -230,53 +265,87 @@ classifclung ={
 'lung':white
  }
 #only label we consider, number will start at 0 anyway
-if wbg :
+ 
+
+if pset ==0:
+    usedclassif = [
+        'back_ground',
+        'consolidation',
+        'HC',
+        'ground_glass',
+        'healthy',
+        'micronodules'
+        ,'reticulation'
+    #    'air_trapping',
+    #    'cysts',
+    #    'bronchiectasis'
+        ]
     classif ={
-'back_ground':0,
-'consolidation':1,
-'HC':2,
-'ground_glass':3,
-'healthy':4,
-'micronodules':5,
-'reticulation':6,
-'air_trapping':7,
-'cysts':8,
-'bronchiectasis':9,
-'nolung':10,
-
- 'bronchial_wall_thickening':11,
- 'early_fibrosis':12,
- 'emphysema':13,
- 'increased_attenuation':14,
- 'macronodules':15,
- 'pcp':16,
- 'peripheral_micronodules':17,
- 'tuberculosis':18
-                   }
-else:
-      classif ={
-    'consolidation':0,
-    'HC':1,
+        'back_ground':0,
+        'consolidation':1,
+        'HC':2,
+        'ground_glass':3,
+        'healthy':4,
+        'micronodules':5,
+        'reticulation':6,
+        'air_trapping':7,
+        'cysts':8,
+        'bronchiectasis':9,
+        
+         'bronchial_wall_thickening':10,
+         'early_fibrosis':11,
+         'emphysema':12,
+         'increased_attenuation':13,
+         'macronodules':14,
+         'pcp':15,
+         'peripheral_micronodules':16,
+         'tuberculosis':17
+        }
+elif pset==1:
+    usedclassif = [
+        'back_ground',
+        'consolidation',
+        'ground_glass',
+        'healthy'
+    #    ,'cysts'
+        ]
+        
+    classif ={
+    'back_ground':0,
+    'consolidation':1,
     'ground_glass':2,
-    'healthy':3,
-    'micronodules':4,
-    'reticulation':5,     
-    'air_trapping':6,
-    'cysts':7,    
-    'bronchiectasis':8,
-    'nolung':9,
-    
-    
-     'bronchial_wall_thickening':10,
-
-     'early_fibrosis':11,
-     'emphysema':12,
-     'increased_attenuation':13,
-     'macronodules':14,
-     'pcp':15,
-     'peripheral_micronodules':16,
-     'tuberculosis':17
-      }
+    'healthy':3
+    #,'cysts':4
+    }
+elif pset==2:
+        usedclassif = [
+        'back_ground',
+        'HC',
+        'healthy',
+        'micronodules'
+        ,'reticulation'
+        ]
+        
+        classif ={
+    'back_ground':0,
+    'HC':1,
+    'healthy':2,
+    'micronodules':3,
+    'reticulation':4,
+    }
+elif pset==3:
+    usedclassif = [
+        'back_ground',
+        'healthy',
+        'air_trapping',
+        ]
+    classif ={
+        'back_ground':0,
+        'healthy':1,
+        'air_trapping':2,
+        }
+else:
+        print 'eRROR :', pset, 'not allowed'
 
 
 classifc ={
@@ -337,7 +406,7 @@ def genebmp(dirName,fn,subs):
     
     scipy.misc.imsave(bmpfile, ds.pixel_array)
     imgor=cv2.imread(bmpfile)
-    imgresize=cv2.resize(imgor,None,fx=fxs,fy=fys,interpolation=cv2.INTER_LINEAR)
+    imgresize=cv2.resize(imgor,None,fx=fxs,fy=fys,interpolation=cv2.INTER_CUBIC)
     cv2.imwrite(bmpfile,imgresize)
 #    imretrieve=cv2.imread(bmpfile,0)
 #    print 'imretrieve',imretrieve.shape,imretrieve.dtype
@@ -375,7 +444,7 @@ def genebmp(dirName,fn,subs):
                             lungcoref=os.path.join(lung_bmp_dir,imgcorescan)
                             scipy.misc.imsave(lungcoref, dslung.pixel_array)
                             lungr=cv2.imread(lungcoref)
-                            lungresize=cv2.resize(lungr,None,fx=fxs,fy=fys,interpolation=cv2.INTER_LINEAR)
+                            lungresize=cv2.resize(lungr,None,fx=fxs,fy=fys,interpolation=cv2.INTER_CUBIC)
 #            bmpfiler=os.path.join(bmp_dir,imgcore)
                             cv2.imwrite(lungcoref,lungresize)                          
                             
@@ -385,14 +454,15 @@ def genebmp(dirName,fn,subs):
     if  not lungFound:
               generatelungmask(dirName,imgcore,slicenumber)
 
-def normi(img):
+def normi(tabi):
      """ normalise patches 0 255"""
-     tabi = np.array(img)
+#     tabi = np.array(img)
 #     print(tabi.min(), tabi.max())
      tabi1=tabi-tabi.min()
 #     print(tabi1.min(), tabi1.max())
      tabi2=tabi1*(255/float(tabi1.max()-tabi1.min()))
 #     print(tabi2.min(), tabi2.max())
+     tabi2=tabi2.astype('uint8')
      return tabi2
 
 def lungpredict(dn,nd,sln):
@@ -476,29 +546,40 @@ def pavgenelung(dn,nd,sln):
     #        j=maxj
              while j<=ymax:
                     crorig = im.crop((i, j, i+lungdimpavx, j+lungdimpavy))
-                    imagemax=crorig.getbbox()
-                                            
-                    min_val=np.min(crorig)
-                    max_val=np.max(crorig)
-                         
-                    if imagemax!=None and min_val!=max_val:                                  
+#                    imgra =np.array(crorig)
+#                    imgray = cv2.cvtColor(imgra,cv2.COLOR_BGR2GRAY)
+#                    imagemax=crorig.getbbox()                                            
+#                    min_val=np.min(imgray)
+#                    max_val=np.max(crorig)
+#                         
+#                    if imagemax!=None and max_val-min_val>10:       
+
+#                    crorig = tabf[j:j+dimpavy,i:i+dimpavx]
+                    imgra =np.array(crorig)
+                    imgray = cv2.cvtColor(imgra,cv2.COLOR_BGR2GRAY)
+                    imagemax= cv2.countNonZero(imgray)
+                    min_val, max_val, min_loc,max_loc = cv2.minMaxLoc(imgray)
+             
+                    if imagemax > 0 and max_val-min_val>10:                           
                                                     
-                        if contrast:
-                            
-                            imgra =np.array(crorig)
-                            imgray = cv2.cvtColor(imgra,cv2.COLOR_BGR2GRAY)
-                                
-                            tabi2 = cv2.equalizeHist(imgray)                                        
+                        if contrastScanLung:
+                             if normiInternalLung:
+                                    tabi2=normi(imgray)
+                                        
+                             else:
+#                                imgra =np.array(crorig)
+#                                imgray = cv2.cvtColor(imgra,cv2.COLOR_BGR2GRAY)
+                                tabi2 = cv2.equalizeHist(imgray)                                        
 #                            scipy.misc.imsave(patchNormpath+nampa, tabi2)                            
 #                            
 #                            
 #                            
 #                            npcrorig =np.array(crorig)
 #                            tabcont = cv2.equalizeHist(npcrorig)
-                            patch_list_lung.append((dptail,sln,i,j,tabi2))
+                                patch_list_lung.append((dptail,sln,i,j,tabi2))
 #                                    n+=1
                         else:
-                            patch_list_lung.append((dptail,sln,i,j,crorig))
+                            patch_list_lung.append((dptail,sln,i,j,imgray))
                         
 #                            tabim[j:j+dimpavy,i:i+dimpavx]=0
                         x=0
@@ -597,15 +678,15 @@ def  genelung(dn,nd,sln):
     erosion = cv2.erode(imgt,kernele,iterations = 1)             
     opening = cv2.morphologyEx(erosion, cv2.MORPH_OPEN, kernelc)                
     dilation = cv2.dilate(opening,kerneld,iterations = 1)
-    cv2.imshow('image',imgt) 
-    cv2.imshow('imageo',tablscan) 
-    cv2.imshow('erosion',erosion) 
-
-    cv2.imshow('opening',opening) 
-
-    cv2.imshow('dilatation',dilation) 
-    cv2.waitKey(0)    
-    cv2.destroyAllWindows()
+#    cv2.imshow('image',imgt) 
+#    cv2.imshow('imageo',tablscan) 
+#    cv2.imshow('erosion',erosion) 
+#
+#    cv2.imshow('opening',opening) 
+#
+#    cv2.imshow('dilatation',dilation) 
+#    cv2.waitKey(0)    
+#    cv2.destroyAllWindows()
     
     imgcorefull=imgcore+'.bmp'
     imgname=os.path.join(predictout_dir,'lung_'+imgcorefull)    
@@ -723,9 +804,11 @@ def pavgene (namedirtopcf):
              
                         if imagemax > 0 and min_val != max_val:
 #                            namepatch=patchpathf+'/p_'+str(slicenumber)+'_'+str(i)+'_'+str(j)+'.'+typei
-                            if contrast:
+                            if contrastScan:
                                     if normiInternal:
-                                        tabi2=normi(crorig)
+                                        
+                                        tabi2=normi(imgray)
+                                        
                                     else:
                                         
                                         
@@ -735,6 +818,7 @@ def pavgene (namedirtopcf):
 #                                        if i==171 and j==323:
 #                                            print i,j,imgray
                                         tabi2 = cv2.equalizeHist(imgray)
+#                                        print tabi2.shape
 #                                        if i==156 and j==295:
 #                                            print i,j,tabi2
 #                                        if i==156:
@@ -783,7 +867,7 @@ def ILDCNNpredict(patient_dir_s):
                 nameset_list.append(fil[0:3])
         
         X = np.array(dataset_list)
-        print X.shape
+#        print X.shape
         X0= X.shape[0]
 #        print X0
         X_predict = np.asarray(np.expand_dims(X,1))/float(255)        
@@ -810,10 +894,10 @@ def ILDCNNpredict(patient_dir_s):
      'res_alias': args.csv if args.csv else 'res'      # csv results filename alias
          }
 #        model = H.load_model()
-
+     
         model = model_from_json(open(jsonf).read())
         model.load_weights(weigf)
-
+       
         model.compile(optimizer='Adam', loss=CNN4.get_Obj(train_params['obj']))        
              
         if X0>0:
@@ -1240,7 +1324,7 @@ def retrievepatch(x,y,top,sln,pr,li):
             ys=f[2]
 #            print xs,ys
             if x>xs and x < xs+dimpavx and y>ys and y<ys+dimpavy:
-#                     print slicenumber, f, x, xs, y, ys
+                     print x, y
                      proba=pr[ill]
                      pfound=True
 
@@ -1530,12 +1614,21 @@ def runpredict(pp,subs,thrp, thpro,retou):
     
     global classdirec,path_patient, patch_list, \
            dataset_list, nameset_list, proba,subsdef,varglobal,thrproba
+    global dimtabx, dimtaby
     for widget in cadretop.winfo_children():       
                 widget.destroy()    
     for widget in cadrelistpatient.winfo_children():
                widget.destroy()
     for widget in cadreparam.winfo_children():
                widget.destroy()
+    for widget in cadrerun.winfo_children():
+               widget.destroy()
+    for widget in cadrestat.winfo_children():
+               widget.destroy()
+    for widget in cadreim.winfo_children():
+               widget.destroy()
+               
+               
 #    cadrestatus.grid(row=1)
     
     cw = Label(cadrestatus, text="Running",fg='red',bg='blue')
@@ -1632,9 +1725,19 @@ def runpredict(pp,subs,thrp, thpro,retou):
                 ILDCNNpredict(namedirtopcf)
                 visua(namedirtopcf,classdirec,True)   
                 spkl=os.path.join(pickledir,subsamplef)
-                pickle.dump(subs, open( spkl, "wb" ))
+                data_scan=(subs,dimtabx)
+                pickle.dump(data_scan, open( spkl, "wb" ))
                 
-            else:                    
+            else:       
+                pickledir = os.path.join( namedirtopcf,picklefile)                  
+                spkl=os.path.join(pickledir,subsamplef)              
+                dd = open(spkl,'rb')
+                my_depickler = pickle.Unpickler(dd)
+                data_scan = my_depickler.load()
+                dd.close()  
+                dimtabx=data_scan[1]
+                dimtaby=dimtabx
+                print dimtabx
                 visua(namedirtopcf,classdirec,False)
             print('completed on: ',f)     
        
