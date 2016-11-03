@@ -40,7 +40,7 @@ print 'instdir', instdir
 
 #########################################################
 #define if the patch set is limited to the only pattrens, or all (set0)
-patchSet='set0'
+#patchSet='set2'
 #picklefile='pickle_sk32'
 listset=['set0','set1','set2']
 picklefile={}
@@ -49,16 +49,15 @@ dimpavys={}
 
 #pattern set definition
 #pset==2:  'HC', 'micronodules'
-#picklefile['set2']='pickle_ex22'
+picklefile['set2']='pickle_ex22'
+dimpavxs['set2'] =16 
+dimpavys['set2'] = 16
+
+
+#picklefile['set2']='pickle_ex17'
 ##patch size in pixels 32 * 32
-#dimpavxs['set2'] =16 
-#dimpavys['set2'] = 16
-
-
-picklefile['set2']='pickle_ex17'
-#patch size in pixels 32 * 32
-dimpavxs['set2'] =28
-dimpavys['set2'] = 28
+#dimpavxs['set2'] =28
+#dimpavys['set2'] = 28
 
 
 #pset==0: 'consolidation', 'HC','ground_glass', 'micronodules', 'reticulation'
@@ -81,11 +80,10 @@ dimpavys['set1'] = 28
 
 
 #subdirectory name to colect pkl filesfor lung  prediction
-picklefilelung='pickle_sk7_lung'
+picklefilelung='pickle_sk8_lung'
 #patch size in pixels for lung 32 * 32
 lungdimpavx =15
 lungdimpavy = 15
-
 #to enhance contrast on patch put True
 contrastScanLung=False
 #normalization internal procedure or openCV
@@ -105,7 +103,8 @@ vbg='A'
 thrpatch = 0.9
 #threshold for probability prediction
 thrproba = 0.5
-
+#threshold for probability prediction specific UIP
+thrprobaUIP=0.5
 #probability for lung acceptance
 thrlung=0.7
 
@@ -277,11 +276,10 @@ classifclung ={
 'nolung':red,
 'lung':white
  }
+ 
 #only label we consider, number will start at 0 anyway
-#classif={}
-if wbg :
-    if patchSet =='set0':
-        classif ={
+    
+classifSet0bg={
             'back_ground':0,
             'consolidation':1,
             'HC':2,
@@ -302,33 +300,27 @@ if wbg :
              'tuberculosis':17
                  }
        
-    elif patchSet=='set1':
-        classif ={
+classifSet1bg={
             'back_ground':0,
             'consolidation':1,
             'ground_glass':2,
             'healthy':3
             #,'cysts':4
                 }
-    elif patchSet=='set2':
-        classif ={
+classifSet2bg={
             'back_ground':0,
             'HC':1,
             'healthy':2,
             'micronodules':3,
             'reticulation':4,
             }
-    elif patchSet=='set3':
-        classif ={
+classifSet3bg={
             'back_ground':0,
             'healthy':1,
-            'air_trapping':2,
+            'air_trapping':2
                     }     
        
-else:
-     
-    if patchSet =='set0':
-        classif ={
+classifSet0Nbg={
             'consolidation':0,
             'HC':1,
             'ground_glass':2,
@@ -349,25 +341,34 @@ else:
              'tuberculosis':16
                  }
        
-    elif patchSet=='set1':
-        classif ={
+classifSet1Nbg={
             'consolidation':0,
             'ground_glass':1,
             'healthy':2
             #,'cysts':4
                 }
-    elif patchSet=='set2':
-        classif ={
+classifSet2Nbg={
             'HC':0,
             'healthy':1,
             'micronodules':2,
             'reticulation':3,
             }
-    elif patchSet=='set3':
-        classif ={
+classifSet3Nbg={
             'healthy':0,
-            'air_trapping':1,
+            'air_trapping':1
                     }
+classif={}                    
+if wbg:
+    classif['set0']=classifSet0bg
+    classif['set1']=classifSet1bg 
+    classif['set2']=classifSet2bg
+    classif['set3']=classifSet3bg
+else:
+    classif['set0']=classifSet0Nbg
+    classif['set1']=classifSet1Nbg
+    classif['set2']=classifSet2Nbg
+    classif['set3']=classifSet3Nbg                                     
+                    
 
 classifc ={
 'back_ground':darkgreen,
@@ -409,10 +410,18 @@ def genebmp(dirName,fn,subs):
 
     FilesDCM =(os.path.join(dirName,fn))  
 #           
-    ds = dicom.read_file(FilesDCM)
+    RefDs = dicom.read_file(FilesDCM)
+    dsr= RefDs.pixel_array
+            #scale the dicom pixel range to be in 0-255
+    dsr= dsr-dsr.min()
+    c=255.0/dsr.max()
+    dsr=dsr*c
+    dsr=dsr.astype('uint8')
+    #resize the dicom to have always the same pixel/mm
+    fxs=float(RefDs.PixelSpacing[0])/avgPixelSpacing   
 #    constPixelSpacing=(float(ds.PixelSpacing[0]), float(ds.PixelSpacing[1]), float(ds.SliceThickness))
-    fxs=float(ds.PixelSpacing[0])/avgPixelSpacing
-    fys=float(ds.PixelSpacing[1])/avgPixelSpacing
+#    fxs=float(ds.PixelSpacing[0])/avgPixelSpacing
+#    fys=float(ds.PixelSpacing[1])/avgPixelSpacing
    
     endnumslice=fn.find('.dcm')
     imgcore=fn[0:endnumslice]+'.'+typei
@@ -426,10 +435,12 @@ def genebmp(dirName,fn,subs):
 
     bmpfile=os.path.join(bmp_dir,imgcore)
     
-    scipy.misc.imsave(bmpfile, ds.pixel_array)
-    imgor=cv2.imread(bmpfile)
-    imgresize=cv2.resize(imgor,None,fx=fxs,fy=fys,interpolation=cv2.INTER_CUBIC)
-    cv2.imwrite(bmpfile,imgresize)
+#    scipy.misc.imsave(bmpfile, ds.pixel_array)
+#    imgor=cv2.imread(bmpfile)
+    imgresize= scipy.misc.imresize(dsr,fxs,interp='bicubic',mode=None)
+#    imgresize=cv2.resize(imgor,None,fx=fxs,fy=fys,interpolation=cv2.INTER_CUBIC)
+#    cv2.imwrite(bmpfile,imgresize)
+    scipy.misc.imsave(bmpfile,imgresize)
 #    imretrieve=cv2.imread(bmpfile,0)
 #    print 'imretrieve',imretrieve.shape,imretrieve.dtype
 #    print imretrieve[0][0]
@@ -442,39 +453,56 @@ def genebmp(dirName,fn,subs):
     lung_dir = os.path.join(dirName, lungmask)
     
     lung_bmp_dir = os.path.join(lung_dir,lungmaskbmp)
-    lunglist = os.listdir(lung_dir)
-    #             print(lung_bmp_dir)
+    
+    lung_bmp_listr = os.listdir(lung_bmp_dir)
     lungFound=False
-    for lungfile in lunglist:
-    #                print(lungfile)
-                    if ".dcm" in lungfile.lower():
-                        endnumslice=lungfile.find('.dcm')
-                        imgcorescan=lungfile[0:endnumslice]+'.'+typei  
+    for llung in     lung_bmp_listr:
+         if ".bmp" in llung.lower():
+                        endnumslice=llung.find('.bmp')
                         posend=endnumslice
-                        while lungfile.find('_',posend)==-1:
+                        while llung.find('_',posend)==-1:
                             posend-=1
                         debnumslice=posend+1
-                        slicescan=int(lungfile[debnumslice:endnumslice])
+                        slicescan=int(llung[debnumslice:endnumslice])
 #                        print slicescan
                         if slicescan== slicenumber:
-
-        # check whether the file's DICOM
                             lungFound=True
-                            lungDCM =os.path.join(lung_dir,lungfile)  
-                            dslung = dicom.read_file(lungDCM)
-
-                            lungcoref=os.path.join(lung_bmp_dir,imgcorescan)
-                            scipy.misc.imsave(lungcoref, dslung.pixel_array)
-                            lungr=cv2.imread(lungcoref)
-                            lungresize=cv2.resize(lungr,None,fx=fxs,fy=fys,interpolation=cv2.INTER_CUBIC)
-#            bmpfiler=os.path.join(bmp_dir,imgcore)
-                            cv2.imwrite(lungcoref,lungresize)                          
-                            
                             break
+         else:    
+                
+                lunglist = os.listdir(lung_dir)
+                #             print(lung_bmp_dir)
+                for lungfile in lunglist:
+                #                print(lungfile)
+                                if ".dcm" in lungfile.lower():
+                                    endnumslice=lungfile.find('.dcm')
+                                    imgcorescan=lungfile[0:endnumslice]+'.'+typei  
+                                    posend=endnumslice
+                                    while lungfile.find('_',posend)==-1:
+                                        posend-=1
+                                    debnumslice=posend+1
+                                    slicescan=int(lungfile[debnumslice:endnumslice])
+            #                        print slicescan
+                                    if slicescan== slicenumber:
+            
+                    # check whether the file's DICOM
+                                        lungFound=True
+                                        lungDCM =os.path.join(lung_dir,lungfile)  
+                                        dslung = dicom.read_file(lungDCM)
+            
+                                        lungcoref=os.path.join(lung_bmp_dir,imgcorescan)
+                                        scipy.misc.imsave(lungcoref, dslung.pixel_array)
+                                        lungr=cv2.imread(lungcoref)
+                                        lungresize=cv2.resize(lungr,None,fx=fxs,fy=fys,interpolation=cv2.INTER_CUBIC)
+            #            bmpfiler=os.path.join(bmp_dir,imgcore)
+                                        cv2.imwrite(lungcoref,lungresize)                          
+                                        
+                                        break
 #                        else:
 #                            generatelungmask(dirName,imgcore,slicenumber)
     if  not lungFound:
-              generatelungmask(dirName,imgcore,slicenumber)
+        print 'lung not found'
+        generatelungmask(dirName,imgcore,slicenumber)
 
 def normi(tabi):
      """ normalise patches 0 255"""
@@ -534,14 +562,14 @@ def lungpredict(dn,nd,sln):
         model.compile(optimizer='Adam', loss=CNN4.get_Obj(train_params['obj']))        
 
         proba = model.predict_proba(X_predict, batch_size=100)
-        picklefileout_f_dir = os.path.join( dn,picklefile)
+        picklefileout_f_dir = os.path.join( dn,picklefilelung)
         xfp=os.path.join(picklefileout_f_dir,lungXprepkl)
         pickle.dump(proba, open( xfp, "wb" ))
         xfpr=os.path.join(picklefileout_f_dir,lungXrefpkl)
         pickle.dump(patch_list_lung, open( xfpr, "wb" ))
 
 def pavgenelung(dn,nd,sln):
-#    print('generate pavement  on: ',nd, 'slice:',sln)
+    print('generate pavement  on: ',nd, 'slice:',sln)
     global patch_list_lung
     (dptop,dptail)=os.path.split(dn)
     bmpdir = os.path.join(dn,scanbmp)
@@ -549,6 +577,7 @@ def pavgenelung(dn,nd,sln):
 #    listbmp= os.listdir(bmpdir)
 #    for img in listbmp:
     bmpfile = os.path.join(bmpdir,nd)
+#    print bmpfile
     tabf = cv2.imread(bmpfile,1)
 #             im = cv2.imread(bmpfile,1)
     im = ImagePIL.open(bmpfile)
@@ -560,7 +589,7 @@ def pavgenelung(dn,nd,sln):
     xmax=atabf[1].max()-lungdimpavx
     ymin=atabf[0].min()
     ymax=atabf[0].max()-lungdimpavy
-                
+#    print xmin,xmax,ymin,ymax           
     i=xmin
     while i <= xmax:
              j=ymin
@@ -571,7 +600,7 @@ def pavgenelung(dn,nd,sln):
                                             
                     min_val=np.min(crorig)
                     max_val=np.max(crorig)
-                         
+#                    print imagemax,min_val,max_val
                     if imagemax!=None and max_val-min_val>10:                                  
                         imgra =np.array(crorig)
                         imgray = cv2.cvtColor(imgra,cv2.COLOR_BGR2GRAY)                           
@@ -584,7 +613,7 @@ def pavgenelung(dn,nd,sln):
                                  patch_list_lung.append((dptail,sln,i,j,tabi2))
 #                                    n+=1
                         else:
-                            patch_list_lung.append((dptail,sln,i,j,crorig))
+                            patch_list_lung.append((dptail,sln,i,j,imgray))
                         
 #                            tabim[j:j+dimpavy,i:i+dimpavx]=0
                         x=0
@@ -696,7 +725,7 @@ def  genelung(dn,nd,sln):
     imgcorefull=imgcore+'.bmp'
     imgname=os.path.join(predictout_dir,'lung_'+imgcorefull)    
 #    print 'imgname',imgname
-    lungname= 'gene_lung'+imgcorwosln+'_'+str(sln)+'.bmp'
+    lungname= 'agene_lung'+imgcorwosln+'_'+str(sln)+'.bmp'
     
     imgnamelung=os.path.join(lung_dir_bmp,lungname)
 #    print imgname
@@ -719,6 +748,7 @@ def generatelungmask(dn,nd,sln):
 
 def pavgene (namedirtopcf,nset):
         """ generate patches from scan"""
+        patch_list=[]
 #        print('generate patches on: ',namedirtopcf)
         (dptop,dptail)=os.path.split(namedirtopcf)
         namemask1=os.path.join(namedirtopcf,lungmask)
@@ -834,12 +864,16 @@ def pavgene (namedirtopcf,nset):
                  i+=1
 #        print namedirtopcf,n
              scipy.misc.imsave(jpegpathf+'/'+'s_'+str(slicenumber)+'.bmp', tabf)
+        return patch_list
 # 
-def ILDCNNpredict(patient_dir_s,setn):     
+def ILDCNNpredict(patient_dir_s,setn,patch_list):     
         
 #        print ('predict patches on: ',patient_dir_s) 
         (top,tail)=os.path.split(patient_dir_s)
-        print ('predict patches on: ',tail) 
+        print ('predict patches on: ',tail, 'set:',setn) 
+        dataset_list=[]
+        nameset_list=[]
+ 
         for fil in patch_list:
             if fil[0]==tail:
                
@@ -884,12 +918,14 @@ def ILDCNNpredict(patient_dir_s,setn):
             proba = model.predict_proba(X_predict, batch_size=100)
         else:
             proba=()
-        picklefileout_f_dir = os.path.join( patient_dir_s,picklefile[setn])     
+#        picklefileout_f_dir = os.path.join( patient_dir_s,picklefile[setn])  
+        picklefileout_f_dir = os.path.join( patient_dir_s,setn)     
+
         xfp=os.path.join(picklefileout_f_dir,Xprepkl)
         pickle.dump(proba, open( xfp, "wb" ))
         xfpr=os.path.join(picklefileout_f_dir,Xrefpkl)
         pickle.dump(patch_list, open( xfpr, "wb" ))
-        print 'number of patches', len(patch_list)
+        print 'number of patches', len(patch_list), 'in :',setn
 #        print proba[0]
 
 
@@ -904,28 +940,6 @@ def fidclass(numero,classn):
       
     if not found:
         return 'unknown'
-
- 
-#def tagview(fig,label,pro,x,y,nset):
-#    """write text in image according to label and color"""
-#
-#    col=classifc[label]
-##    print col, label
-#    if wbg :
-#        labnow=classif[nset][label]-1
-#    else:
-#        labnow=classif[nset][label]
-##    print (labnow, text)
-#    if label == 'back_ground':
-#        x=0
-#        y=0        
-#        deltax=0
-#        deltay=60
-#    else:        
-#        deltay=11*((labnow)%5)
-#        deltax=175*((labnow)//5)
-#
-#    cv2.putText(fig,label+' '+pro,(x+deltax, y+deltay+10),cv2.FONT_HERSHEY_PLAIN,0.8,col,1)
 
     
 def tagviews(b,fig,t0,x0,y0,t1,x1,y1,t2,x2,y2,t3,x3,y3,t4,x4,y4):
@@ -958,7 +972,9 @@ def loadpkl(do,nset):
     """crate image directory and load pkl files"""
 #    global classdirec
     
-    picklefileout_f_dir = os.path.join( do,picklefile[nset])
+#    picklefileout_f_dir = os.path.join( do,picklefile[nset])
+    picklefileout_f_dir = os.path.join( do,nset)
+
     xfp=os.path.join(picklefileout_f_dir,Xprepkl)
     dd = open(xfp,'rb')
     my_depickler = pickle.Unpickler(dd)
@@ -985,54 +1001,12 @@ def loadpkl(do,nset):
         n=n+1
     return (preprob,prefile)
     
-def classpatch(do,nset):
-    """class patches per slice"""
-#    global classdirec
-    
-    picklefileout_f_dir = os.path.join( do,picklefile)
-    xfp=os.path.join(picklefileout_f_dir,Xprepkl)
-    dd = open(xfp,'rb')
-    my_depickler = pickle.Unpickler(dd)
-    probaf = my_depickler.load()
-    dd.close()  
-    
-    xfpr=os.path.join(picklefileout_f_dir,Xrefpkl)
-    dd = open(xfpr,'rb')
-    my_depickler = pickle.Unpickler(dd)
-    patch_listr = my_depickler.load()
-    dd.close() 
-    
-    preprob=[]
-    prefile=[]
-    
-    (top,tail)=os.path.split(do)
-
-    n=0
-    for fil in patch_listr:        
-        if fil[0]==tail:
-#            print n, proba[n]
-            preprob.append(probaf[n])
-            prefile.append(fil[1:4])
-        n=n+1
-#    print (preprob,prefile)
-    ill=0
-    for ll in prefile:
-            slicename=ll[0] 
-            xpat=ll[1]
-            ypat=ll[2]
-            proba=preprob[ill]          
-            prec, mprobai = maxproba(proba)
-            mproba=round(mprobai,2)
-            classlabel=fidclass(prec,classif) 
-#            classcolor=classifc[classlabel]
-            print slicename, xpat,ypat, classlabel, mproba
-            ill+=1
 
 def loadpkllung(do):
     """crate image directory and load pkl files"""
 #    global classdirec
     
-    picklefileout_f_dir = os.path.join( do,picklefile)
+    picklefileout_f_dir = os.path.join( do,picklefilelung)
     xfp=os.path.join(picklefileout_f_dir,lungXprepkl)
     dd = open(xfp,'rb')
     my_depickler = pickle.Unpickler(dd)
@@ -1086,9 +1060,9 @@ def tagviewn(fig,label,pro,nbr,x,y,nset):
     col=classifc[label]
 #    print col, label
     if wbg :
-        labnow=classif[label]-1
+        labnow=classif[nset][label]-1
     else:
-        labnow=classif[label]
+        labnow=classif[nset][label]
 #    print (labnow, text)
     if label == 'back_ground':
         x=0
@@ -1111,9 +1085,9 @@ def  visua(dirpatientdb,cla,wra,nset):
         (dptop1,dptail1)=os.path.split(dptop)
         topdir=dptail1
 #        print 'topdir visua',topdir
-    for i in range (0,len(classif)):
+    for i in range (0,len(classif[nset])):
 #        print 'visua dptail', topdir
-        listelabelfinal[topdir,fidclass(i,classif)]=0
+        listelabelfinal[topdir,fidclass(i,classif[nset])]=0
     #directory name with predict out dabasase, will be created in current directory
     predictout_dir = os.path.join(dirpatientdb, predictout)
     predictout_dir_bv = os.path.join(predictout_dir,vbg)
@@ -1161,7 +1135,9 @@ def  visua(dirpatientdb,cla,wra,nset):
             proba=preprob[ill]          
             prec, mprobai = maxproba(proba)
             mproba=round(mprobai,2)
-            classlabel=fidclass(prec,classif) 
+#            print classif[nset],nset,prec
+            classlabel=fidclass(prec,classif[nset]) 
+#            print classlabel
             classcolor=classifc[classlabel]
 #            print slicenumber, slicename,dptail
             if slicenumber == slicename and\
@@ -1179,7 +1155,7 @@ def  visua(dirpatientdb,cla,wra,nset):
                     else:
                         listlabelf[classlabel]=1
                         
-            if mproba >thrproba and slicenumber == slicename and\
+            if mprobai >thrproba and slicenumber == slicename and\
              (dptail in datahealthy or (classlabel not in excluvisu)):
 
                     if classlabel in listlabelrec:
@@ -1250,7 +1226,7 @@ def  visua(dirpatientdb,cla,wra,nset):
 #    print listlabelf
     for classlabel in listlabelf:  
           listelabelfinal[topdir,classlabel]=listlabelf[classlabel]
-          print 'patient: ',topdir,', label:',classlabel,': ',listlabelf[classlabel]
+          print 'set:',nset,'patient: ',topdir,', label:',classlabel,': ',listlabelf[classlabel]
           string=str(classlabel)+': '+str(listlabelf[classlabel])+'\n' 
 #          print string
           errorfile.write(string )
@@ -1364,10 +1340,10 @@ def retrievepatch(x,y,top,sln,pr,li,nset):
 #                     for j in range (0,2):
                          if proba[j]>0.01:
                              n=n+1
-                             strw=fidclass(j,classif)+ ' {0:.1f}%'.format(100*proba[j])                             
+                             strw=fidclass(j,classif[nset])+ ' {0:.1f}%'.format(100*proba[j])                             
                              cv2.putText(tabtext,strw,(dimtabx-142,(dimtaby-60)+10*n),cv2.FONT_HERSHEY_PLAIN,0.8,(0,255,0),1)
                              
-                             print fidclass(j,classif), ' {0:.2f}%'.format(100*proba[j])
+                             print fidclass(j,classif[nset]), ' {0:.2f}%'.format(100*proba[j])
                      print'found'
                      break 
 #    cv2.imshow('image',tabtext)                
@@ -1400,12 +1376,12 @@ def drawpatch(t,lp,preprob,k,top,nset):
             proba=preprob[ill]
            
             prec, mprobai = maxproba(proba)
-            mproba=round(mprobai,2)
-            classlabel=fidclass(prec,classif)
+
+            classlabel=fidclass(prec,classif[nset])
             classcolor=classifc[classlabel]
        
             
-            if mproba >th and slicenumber == slicename and\
+            if mprobai >th and slicenumber == slicename and\
             (top in datahealthy or (classlabel not in excluvisu)):
 #                    print classlabel
                     if classlabel in listlabel:
@@ -1414,11 +1390,11 @@ def drawpatch(t,lp,preprob,k,top,nset):
                         listlabel[classlabel]=numl+1
                         cur=listlabelaverage[classlabel]
 #                               print (numl,cur)
-                        averageproba= round((cur*numl+mproba)/(numl+1),2)
+                        averageproba= round((cur*numl+mprobai)/(numl+1),2)
                         listlabelaverage[classlabel]=averageproba
                     else:
                         listlabel[classlabel]=1
-                        listlabelaverage[classlabel]=mproba
+                        listlabelaverage[classlabel]=mprobai
 
                     imgn= addpatchn(classcolor,classlabel,xpat,ypat,imgn,nset)
 
@@ -1427,7 +1403,7 @@ def drawpatch(t,lp,preprob,k,top,nset):
 #            print listlabel        
     for ll1 in listlabel:
 #                print ll1,listlabelaverage[ll1]
-                tagviewn(imgn,ll1,str(listlabelaverage[ll1]),listlabel[ll1],175,00,nset)
+                tagviewn(imgn,ll1,str(round(listlabelaverage[ll1],2)),listlabel[ll1],175,00,nset)
     ts='Treshold:'+str(t)
 #    cv2.putText(imgn,ts,(0,42),cv2.FONT_HERSHEY_PLAIN,1,white,0.8,cv2.LINE_AA)
     cv2.putText(imgn,ts,(0,42),cv2.FONT_HERSHEY_PLAIN,0.8,white,1,cv2.LINE_AA)
@@ -1461,7 +1437,7 @@ def openfichier(k,dirk,top,L,nset):
         ll=os.listdir(ncf1)
         for l in ll:
             ncf =os.path.join(ncf1,l)
-            dop =os.path.join(ncf,picklefile)
+            dop =os.path.join(ncf,picklefile[nset])
     else:
         ncf=ncf1
             
@@ -1597,7 +1573,7 @@ def opendir(k,nset):
     '\n\n'+'Predicted patterns: '+'\n' 
     for cle, valeur in listelabelfinal.items():
 #             print 'cle valeur', cle,valeur
-             for c in classif:
+             for c in classif[nset]:
 #                 print (k,c)
                  if (k,c) == cle and listelabelfinal[(k,c)]>0:
 
@@ -1639,10 +1615,111 @@ def quit():
     fenetre.quit()
     fenetre.destroy()   
 
+def posP(sln):
+    global lungSegment
+    if sln in lungSegment['upperset']:
+        psp='upperset'
+    elif sln in lungSegment['middleset']:
+        psp='middleset'
+    else:
+        psp='lowerset'
+    return psp
 
-def  calcSupNp (ntp, pat,nset):
+def  calcMed (ntp, nset):
+    '''calculate the median position in between left and right lung'''
+#    print 'number of subpleural for : ',pat
+#    print 'subpleural', ntp, pat
+    global lungSegment
+    tabMed={}
+#    print subErosion,avgPixelSpacing,subErosionPixel
+    lung_dir = os.path.join(ntp, lungmask)  
+    lung_bmp_dir = os.path.join(lung_dir,lungmaskbmp)
+    lunglist = os.listdir(lung_bmp_dir)
+    for l in lunglist:
+        endnumslice=l.find('.bmp')
+        posend=endnumslice
+        while l.find('_',posend)==-1:
+            posend-=1
+        debnumslice=posend+1
+        slicename=int(l[debnumslice:endnumslice]) 
+
+        if slicename in lungSegment['allset']:
+#             print 'slicename',slicename
+             lf=os.path.join(lung_bmp_dir,l)
+             imscan = ImagePIL.open(lf)             
+             imscanarray=np.array(imscan) 
+             imgngray = cv2.cvtColor(imscanarray,cv2.COLOR_BGR2GRAY)
+             imgngrayblur=cv2.medianBlur(imgngray,(5))
+
+             im2,contours0, hierarchy = cv2.findContours(imgngrayblur,cv2.RETR_TREE,\
+                      cv2.CHAIN_APPROX_SIMPLE)   
+  
+             xmed=np.zeros((2), np.uint16)
+             xmaxi=np.zeros((2), np.uint16)
+             xmini=np.zeros((2), np.uint16)
+             
+             areaArray =[]
+             for i,c in enumerate(contours0):
+                  area = cv2.contourArea(c)
+                  areaArray.append(area)
+
+#first sort the array by area
+             sorteddata = sorted(zip(areaArray, contours0), key=lambda x: x[0], reverse=True)
+
+#find the nth largest contour [n-1][1], in this case 2
+             xmed= np.zeros(3, np.uint16)
+             xmini=np.zeros(3, np.uint16)
+             xmaxi=np.zeros(3, np.uint16)
+             
+             firstlargestcontour = sorteddata[0][1]
+             visa = np.zeros((dimtabx,dimtaby,3), np.uint8)
+             cv2.drawContours(visa,firstlargestcontour,-1,white,1)
+             npvisa=np.array(visa)
+             atabf = np.nonzero(npvisa)
+             xmin=atabf[1].min()
+             xmax=atabf[1].max()
+             xmed[0]=(xmax+xmin)/2
+             xmini[0]=xmin
+             xmaxi[0]=xmax
+             
+             
+             secondlargestcontour = sorteddata[1][1]
+             visa = np.zeros((dimtabx,dimtaby,3), np.uint8)
+             cv2.drawContours(visa,secondlargestcontour,-1,white,1)
+             npvisa=np.array(visa)
+             atabf = np.nonzero(npvisa)
+             xmin=atabf[1].min()
+             xmax=atabf[1].max()
+             xmed[1]=(xmax+xmin)/2
+             xmini[1]=xmin
+             xmaxi[1]=xmax
+#         
+##                  cv2.imshow('cont',visa)
+##                  cv2.waitKey(0)    
+##                  cv2.destroyAllWindows()
+                     
+             xmedf=0     
+#             print n
+             ifinmin=0
+             for i in range (0,2):
+#                 print '3', i, xmed[i],xmedf
+                 if xmed[i]>xmedf:
+                
+                     xmedf=xmed[i]
+                     ifinmax=i
+                 else:
+                     ifinmin=i
+                     
+             xmedian=    (xmini[ifinmax]+xmaxi[ifinmin])/2
+             tabMed[slicename]=xmedian
+
+
+    return tabMed
+
+
+def  calcSupNp (ntp, pat,nset,tabmed):
     '''calculate the number of reticulation and HC in subpleural'''
-    print 'number of subpleural for : ',pat
+#    print 'number of subpleural for : ',pat
 #    print 'subpleural', ntp, pat
     global lungSegment
     
@@ -1650,26 +1727,20 @@ def  calcSupNp (ntp, pat,nset):
     dimpavy=dimpavys[nset]
     pxy=pxys[nset]
     dictP={}
-    dictTotalP=0
-    dictP['upperset']=0
-    dictP['middleset']=0
-    dictP['lowerset']=0
+#    dictPS={}
+    dictP['upperset']=(0,0)
+    dictP['middleset']=(0,0)
+    dictP['lowerset']=(0,0)
+    dictP['all']=(0,0)
+#    dictPS['upperset']=(0,0)
+#    dictPS['middleset']=(0,0)
+#    dictPS['lowerset']=(0,0)
+#    dictPS['all']=(0,0)
+    preprob,prefile=loadpkl(ntp,nset)
     predictout_dir = os.path.join(ntp,predictout)
     predictout_dir_bv = os.path.join(predictout_dir,vbg)
     listbg=os.listdir(predictout_dir_bv)
-    picklefileout_f_dir = os.path.join( ntp,picklefile[nset])
-    xfp=os.path.join(picklefileout_f_dir,Xprepkl)
-    dd = open(xfp,'rb')
-    my_depickler = pickle.Unpickler(dd)
-    probaf = my_depickler.load()
-    dd.close()  
-    
-    xfpr=os.path.join(picklefileout_f_dir,Xrefpkl)
-    dd = open(xfpr,'rb')
-    my_depickler = pickle.Unpickler(dd)
-    patch_listr = my_depickler.load()
-    dd.close() 
-#    print 'number of patches retrieved', len(patch_listr)
+
 #subErosion= 10 in mm
 #avgPixelSpacing=0.734 in mm/ pixel  
     subErosionPixel=int(round(2*subErosion/avgPixelSpacing))
@@ -1704,55 +1775,31 @@ def  calcSupNp (ntp, pat,nset):
              imscanarray=np.array(imscan) 
              imbgarray=np.array(imbg)
              imgngray = cv2.cvtColor(imscanarray,cv2.COLOR_BGR2GRAY)
-             
+             imgngrayblur=cv2.medianBlur(imgngray,(5))
+
+             im2,contours0, hierarchy = cv2.findContours(imgngrayblur,cv2.RETR_TREE,\
+                      cv2.CHAIN_APPROX_SIMPLE)   
+  
+
              kernele=np.ones((subErosionPixel,subErosionPixel),np.uint8)
              erosion = cv2.erode(imgngray,kernele,iterations = 1)     
-#             
-#             cv2.imwrite(str(ill)+'b.bmp',erosion)
+             
              ret, mask = cv2.threshold(erosion, 0, 255, cv2.THRESH_BINARY)
              mask_inv = cv2.bitwise_not(mask)  
              
-#             print imgngray.shape,imgngray.dtype
-#             print mask_inv.shape,mask_inv.dtype
              subpleurmask = cv2.bitwise_and(imgngray,imgngray,mask = mask_inv) 
 
              im2,contours0, hierarchy = cv2.findContours(subpleurmask,cv2.RETR_TREE,\
-                      cv2.CHAIN_APPROX_SIMPLE)        
+                      cv2.CHAIN_APPROX_SIMPLE)      
+                                
+                 
              contours = [cv2.approxPolyDP(cnt, 0, True) for cnt in contours0]
-#        cv2.drawContours(vis,contours,-1,col,1,cv2.LINE_AA)
              cv2.drawContours(vis,contours,-1,white,1)
              cv2.imwrite(lfbg,cv2.add(vis,imbgarray))
-#             cv2.imshow('imscan',imscanarray) 
-#             cv2.imshow('imbg',imbgarray) 
-#             cv2.imshow('vis',cv2.add(vis,imbgarray) )
-##                            cv2.imshow('pleur',subpleurmask) 
-##                            cv2.imshow('tabsubpl',tabsubpl+subpleurmask) 
-####    cv2.imshow('dilatation',dilation) 
-#             cv2.waitKey(0)    
-#             cv2.destroyAllWindows()             
-             
-             
-             
+
              np.putmask(subpleurmask,subpleurmask>0,100)
 
-#             cv2.imwrite(str(ill)+'a.bmp',subpleurmask)             
-             preprob=[]
-             prefile=[]
-    
-             (top,tail)=os.path.split(ntp)
-#             print 'tail',tail
-             n=0
-#             print patch_listr[0:1]
-             for fil in patch_listr:        
-                if fil[0]==tail:
-#            print n, proba[n]
-                    preprob.append(probaf[n])
-                    prefile.append(fil[1:4])
-                n=n+1
-#    print (preprob,prefile)
              ill=0
-#             print 'number of patches in ', tail,  len(prefile)
-#                print prefile
              for ll in prefile:
                     
                     slicenamepatch=ll[0] 
@@ -1760,131 +1807,255 @@ def  calcSupNp (ntp, pat,nset):
                     ypat=ll[2]
                     proba=preprob[ill]          
                     prec, mprobai = maxproba(proba)
-                    mproba=round(mprobai,2)
-                    classlabel=fidclass(prec,classif) 
-                    if classlabel==pat and mproba>thrproba:
-                        
-#                            dictTotalP+=1
+#                    mproba=round(mprobai,2)
+                    classlabel=fidclass(prec,classif[nset]) 
+                    if classlabel==pat and mprobai>thrprobaUIP:
                         if slicename == slicenamepatch:
 #                                print ll
-#                                print slicename,xpat,ypat,classlabel
+#                            print slicename,xpat,ypat,classlabel
+                            midx=tabmed[slicename]
+                    
+                            if xpat >= midx:
+                              pospr=1
+                              pospl=0
+                            else:
+                              pospr=0
+                              pospl=1
                             tabpatch = np.zeros((dimtabx,dimtaby), np.uint8)
                             tabpatch[ypat:ypat+dimpavy,xpat:xpat+dimpavx]=150
+                            
                             tabsubpl = cv2.bitwise_and(subpleurmask,subpleurmask,mask = tabpatch)  
-                                                     
-#                            
-#                            cv2.imshow('original',imgngray) 
-#                            cv2.imshow('tabpatch',tabpatch) 
-#                            cv2.imshow('pleur',subpleurmask) 
-#                            cv2.imshow('tabsubpl',tabsubpl+subpleurmask) 
-###    cv2.imshow('dilatation',dilation) 
-#                            cv2.waitKey(0)    
-#                            cv2.destroyAllWindows()
                             np.putmask(tabsubpl,tabsubpl>0,1)   
                             area= tabsubpl.sum()  
-#                            print tabsubpl
-        
 #                    check if area above threshold
                             targ=float(area)/pxy
-#                     if i==156and j==403:
-#                         print i,j,tabpatch[0]
-#                         print area, pxy
-#                     print area, pxy
-#                            print area, targ,thrpatch
+
                             if targ>thrpatch:                            
 #                                print area, targ,thrpatch
-                                dictTotalP=dictTotalP+1
-                                if slicename in lungSegment['upperset']:
-                                    dictP['upperset']=dictP['upperset']+1
-                                elif slicename in lungSegment['middleset']:
-                                  dictP['middleset']=dictP['middleset']+1
-                                else:
-                                  dictP['lowerset']=dictP['lowerset']+1
+#                                dictP['all']=dictP['all']+1
+                                dictP['all']=(dictP['all'][0]+pospl,dictP['all'][1]+pospr)
+                                psp=posP(slicename)
+                                dictP[psp]=(dictP[psp][0]+pospl,dictP[psp][1]+pospr)
+                
+#                                dictP[psp]=dictP[psp]+1
                     ill+=1
-    return dictP,dictTotalP
+    return dictP
   
 
-def calculateNp (do, pat,nset):
-#    print do,pat
-    """class patches per slice"""
-#    global classdirec
-    print 'number of patches for : ',pat
+#def calculateNp (do, pat,nset):
+#    """class patches per slice"""
+##    print 'number of patches for : ',pat
+#    dictP={}
+#    dictPS={}
+#    dictP['upperset']=0
+#    dictP['middleset']=0
+#    dictP['lowerset']=0
+#    dictP['all']=0
+#    dictPS['all']=0
+#    dictPS['upperset']=0
+#    dictPS['middleset']=0
+#    dictPS['lowerset']=0
+#    preprob,prefile=loadpkl(do,nset)
+#    
+#    ill=0
+#    for ll in prefile:
+#            slicename=ll[0] 
+#            proba=preprob[ill]          
+#            prec, mprobai = maxproba(proba)
+#            classlabel=fidclass(prec,classif[nset]) 
+#            psp=posP(slicename)
+#            if classlabel==pat and mprobai>thrprobaUIP:
+#                dictP['all']=dictP['all']+1                                
+#                dictP[psp]=dictP[psp]+1
+#               
+#            dictPS['all']=dictPS['all']+1
+#            dictPS[psp]=dictPS[psp]+1
+#
+#            ill+=1
+#    return dictP,dictPS
+
+def diffMicro(do, pat,nset,tabMed):
+    '''calculate number of diffuse micronodules, left and right '''
+
     dictP={}
-    dictTotalP=0
-    dictP['upperset']=0
-    dictP['middleset']=0
-    dictP['lowerset']=0
+    dictPS={}
+    dictP['upperset']=(0,0)
+    dictP['middleset']=(0,0)
+    dictP['lowerset']=(0,0)
+    dictP['all']=(0,0)
+    dictPS['all']=(0,0)
+    dictPS['upperset']=(0,0)
+    dictPS['middleset']=(0,0)
+    dictPS['lowerset']=(0,0)
 
-    picklefileout_f_dir = os.path.join( do,picklefile[nset])
-    xfp=os.path.join(picklefileout_f_dir,Xprepkl)
-    dd = open(xfp,'rb')
-    my_depickler = pickle.Unpickler(dd)
-    probaf = my_depickler.load()
-    dd.close()  
-    
-    xfpr=os.path.join(picklefileout_f_dir,Xrefpkl)
-    dd = open(xfpr,'rb')
-    my_depickler = pickle.Unpickler(dd)
-    patch_listr = my_depickler.load()
-    dd.close() 
-    
-    preprob=[]
-    prefile=[]
-    
-    (top,tail)=os.path.split(do)
-
-    n=0
-    for fil in patch_listr:        
-        if fil[0]==tail:
-#            print n, proba[n]
-            preprob.append(probaf[n])
-            prefile.append(fil[1:4])
-        n=n+1
-#    print (preprob,prefile)
+    preprob,prefile=loadpkl(do,nset)
+        
     ill=0
     for ll in prefile:
             slicename=ll[0] 
+           
             xpat=ll[1]
-            ypat=ll[2]
             proba=preprob[ill]          
             prec, mprobai = maxproba(proba)
-            mproba=round(mprobai,2)
-            classlabel=fidclass(prec,classif) 
-            if classlabel==pat and mproba>thrproba:
-                dictTotalP+=1
-                if slicename in lungSegment['upperset']:
-                    dictP['upperset']=dictP['upperset']+1
-                elif slicename in lungSegment['middleset']:
-                     dictP['middleset']=dictP['middleset']+1
-                else:
-                     dictP['lowerset']=dictP['lowerset']+1
-                        
-#            classcolor=classifc[classlabel]
-#                print slicename, xpat,ypat, classlabel, mproba
+            classlabel=fidclass(prec,classif[nset]) 
+            psp=posP(slicename)
+            midx=tabMed[slicename]
+#            print midx
+            if xpat >= midx:
+                    pospr=1
+                    pospl=0
+            else:
+                    pospr=0
+                    pospl=1
+            if classlabel==pat and mprobai>thrprobaUIP:       
+                dictP[psp]=(dictP[psp][0]+pospl,dictP[psp][1]+pospr)
+                dictP['all']=(dictP['all'][0]+pospl,dictP['all'][1]+pospr)
+                   
+            dictPS['all']=(dictPS['all'][0]+pospl,dictPS['all'][1]+pospr)
+            dictPS[psp]=(dictPS[psp][0]+pospl,dictPS[psp][1]+pospr)
+                            
             ill+=1
-    return dictP, dictTotalP
-        
-def  uiptree(ntp,nset):
-    '''calculate the number of reticulation and HC in total and subpleural'''
+    return dictP,dictPS 
+
+def cv(p,f,d,s):
+    lo=100*float(d['lowerset'][0]+d['lowerset'][1])/(s['lowerset'][0]+s['lowerset'][1])
+    lo=str(round(lo,3))
+    mi=100*float(d['middleset'][0]+d['middleset'][1])/(s['middleset'][0]+s['middleset'][1])
+    mi=str(round(mi,3))
+    up=100*float(d['upperset'][0]+d['upperset'][1])/(s['upperset'][0]+s['upperset'][1])
+    up=str(round(up,3))
+    
+    lol=str(round(100*float(d['lowerset'][0])/s['lowerset'][0],3))
+    mil=str(round(100*float(d['middleset'][0])/s['middleset'][0],3))
+    upl=str(round(100*float(d['upperset'][0])/s['upperset'][0],3))
+    
+    lor=str(round(100*float(d['lowerset'][1])/s['lowerset'][1],3))
+    mir=str(round(100*float(d['middleset'][1])/s['middleset'][1],3))
+    upr=str(round(100*float(d['upperset'][1])/s['upperset'][1],3))
+    
+    f.write(p+': '+\
+    lo+' '+mi+' '+up+\
+    ' N'+' N '+' N'+\
+    ' N'+' N '+' N'+' '+\
+    lol+' '+mil+' '+upl+' '+\
+    lor+' '+mir+' '+upr+'\n')
+
+def cvs(p,f,d,ds,s):
+    lo=100*float(d['lowerset'][0]+d['lowerset'][1])/(s['lowerset'][0]+s['lowerset'][1])
+    lo=str(round(lo,3))
+    mi=100*float(d['middleset'][0]+d['middleset'][1])/(s['middleset'][0]+s['middleset'][1])
+    mi=str(round(mi,3))
+    up=100*float(d['upperset'][0]+d['upperset'][1])/(s['upperset'][0]+s['upperset'][1])
+    up=str(round(up,3))
+    
+    slol=str(round(100*float(ds['lowerset'][0])/s['lowerset'][0],3))
+    smil=str(round(100*float(ds['middleset'][0])/s['middleset'][0],3))
+    supl=str(round(100*float(ds['upperset'][0])/s['upperset'][0],3))
+    
+    slor=str(round(100*float(ds['lowerset'][1])/s['lowerset'][1],3))
+    smir=str(round(100*float(ds['middleset'][1])/s['middleset'][1],3))
+    supr=str(round(100*float(ds['upperset'][1])/s['upperset'][1],3))
+
+    lol=str(round(100*float(d['lowerset'][0])/s['lowerset'][0],3))
+    mil=str(round(100*float(d['middleset'][0])/s['middleset'][0],3))
+    upl=str(round(100*float(d['upperset'][0])/s['upperset'][0],3))
+    
+    lor=str(round(100*float(d['lowerset'][1])/s['lowerset'][1],3))
+    mir=str(round(100*float(d['middleset'][1])/s['middleset'][1],3))
+    upr=str(round(100*float(d['upperset'][1])/s['upperset'][1],3))
+
+    f.write(p+': '+\
+    lo+' '+mi+' '+up+' '+\
+    slol+' '+smil+' '+supl+' '+\
+    slor+' '+smir+' '+supr+' '+\
+    lol+' '+mil+' '+upl+' '+\
+    lor+' '+mir+' '+upr+'\n')
+    
+    
+    
+def  uiptree(ntp):
+    '''calculate the number of reticulation and HC in total and subpleural 
+    and diffuse micronodules'''
+    (top, tail)= os.path.split(ntp)
+#    print tail
 #    classpatch(ntp)
-    dictRET,totalRET=calculateNp(ntp, 'reticulation',nset)
-    dictHC,totalHC=calculateNp(ntp, 'HC',nset)
-    print 'reticulation :', dictRET, totalRET
-    print 'HC :',dictHC,totalHC
+    tabMed=calcMed(ntp, 'set2')
     
-    dictSubRET,totalSubRET=calcSupNp(ntp, 'reticulation',nset)
-    dictSubHC, totalSubHC=calcSupNp(ntp, 'HC',nset)
-    print 'reticulation :', dictSubRET,totalSubRET
-    print 'HC :',dictSubHC,totalSubHC
+    dictRET,dictPSset2LR=diffMicro(ntp, 'reticulation','set2',tabMed)
+    dictHC,dictPSset2LR=diffMicro(ntp, 'HC','set2',tabMed)
+    print '-------------------------------------------'
+    print 'surface total for set2 by segment Left Right:'
+    print dictPSset2LR
+    print '-------------------------------------------'
     
+    print 'reticulation total for set2:'
+    print dictRET
+    print '-------------------------------------------'
     
+    print 'HC total for set2:'
+    print dictHC
+    print '-------------------------------------------'
+    
+    dictSubRET=calcSupNp(ntp, 'reticulation','set2',tabMed)
+    dictSubHC=calcSupNp(ntp, 'HC','set2',tabMed)
+    print 'reticulation subpleural for set2:'
+    print dictSubRET
+    print '-------------------------------------------'
+    
+    print 'HC subleural for set2:'
+    print dictSubHC
+    print '-------------------------------------------'    
+   
+   
 
-
+    dictGG,dictPSset0LR= diffMicro(ntp, 'ground_glass','set0',tabMed) #waiting set1    
+    print 'surface total for set0 left and right:'
+    print dictPSset0LR
+    print '-------------------------------------------'
+    
+    print 'extensive GG for set0:'
+    print dictGG   
+    print '-------------------------------------------'
+    
+    dictDiffMicro,dictPSset2LR= diffMicro(ntp, 'micronodules','set2',tabMed)
+    print 'diffuse micronodules for set2:'
+    print dictDiffMicro
+    print '-------------------------------------------'
+    
+    dictPlobAir,dictPSset0LR= diffMicro(ntp, 'air_trapping','set0',tabMed) #waiting for set3
+#    print 'dictPSset0LR', dictPSset0LR
+    print 'air_trapping for set0:' #waiting for set3
+    print dictPlobAir
+    print '-------------------------------------------'
+    
+    dictPlobConso,dictPSset0LR= diffMicro(ntp, 'consolidation','set0',tabMed)
+    print '-------------------------------------------'
+    print 'Peribronchial or lobar consolidation for set0:'#waiting for set1
+    print dictPlobConso    
+    print '-------------------------------------------'
+    
+    volumefile = open(ntp+'_volume.txt', 'w')
+    volumefile.write('patient: '+tail+'\n')
+    volumefile.write('pattern   lower  middle  upper')
+    volumefile.write('  left_sub_lower  left_sub_middle  left_sub_upper ')
+    volumefile.write('  right_sub_lower  right_sub_middle  right_sub_upper ')
+    volumefile.write('  left_lower  left_middle  left_upper ')
+    volumefile.write(' right_lower  right_middle  right_upper\n')
+    cvs('reticulation',volumefile,dictRET,dictSubRET,dictPSset2LR)
+    cvs('HC',volumefile,dictHC,dictSubHC,dictPSset2LR)
+    cv('ground_glass',volumefile,dictGG,dictPSset0LR)
+    cv('micronodules',volumefile,dictDiffMicro,dictPSset2LR)
+    cv('air_trapping',volumefile,dictPlobAir,dictPSset0LR)
+    cv('consolidation',volumefile,dictPlobConso,dictPSset0LR)
+    
+#    volumefile.write('micronodules: '+lo+' ,'+mi+' ,'+up+' ,'+' ,'+' ,'+' ,'+lol+' ,'+mil+' ,'+upl+' ,'+lor+' ,'+mir+' ,'+upr+'\n')
+    volumefile.close()
+#    
 
 def runpredict(pp,subs,thrp, thpro,retou):
     
     global classdirec,path_patient, patch_list, \
-           dataset_list, nameset_list, proba,subsdef,varglobal,thrproba
+             proba,subsdef,varglobal,thrproba
     global dimtabx, dimtaby
     global lungSegment
     for widget in cadretop.winfo_children():       
@@ -1914,6 +2085,7 @@ def runpredict(pp,subs,thrp, thpro,retou):
        patient_list= os.walk(path_patient).next()[1]
        for f in patient_list:
             lungSegment={}
+            print('================================================') 
             print('work on:',f, 'with subsamples :', subs)        
             namedirtopcf1 = os.path.join(path_patient,f)           
             listscanfile1= os.listdir(namedirtopcf1)
@@ -1947,10 +2119,6 @@ def runpredict(pp,subs,thrp, thpro,retou):
             numberFile=len(ldcm)    
             
             if retou==1:
-                patch_list=[]
-                dataset_list=[]
-                nameset_list=[]
-                proba=[]
                 
                 #directory for scan in bmp
                 bmp_dir = os.path.join(namedirtopcf, scanbmp)
@@ -1966,10 +2134,13 @@ def runpredict(pp,subs,thrp, thpro,retou):
                    
                 #directory for pickle from cnn and status
                 for nset in listset:
-                    pickledir = os.path.join( namedirtopcf,picklefile[nset])             
+                    pickledir = os.path.join( namedirtopcf,nset)             
                     remove_folder(pickledir)
                     os.mkdir(pickledir) 
-                
+            #directory for picklefile lung
+                pickledir_lung = os.path.join( namedirtopcf,picklefilelung)
+                remove_folder(pickledir_lung)
+                os.mkdir(pickledir_lung)
                 #directory for bpredicted images
                 predictout_f_dir = os.path.join( namedirtopcf,predictout)
                 remove_folder(predictout_f_dir)
@@ -1988,10 +2159,7 @@ def runpredict(pp,subs,thrp, thpro,retou):
                 remove_folder(jpegpathf)    
                 os.mkdir(jpegpathf)
                 
-#                subfile=os.path.join(pickledir,subsamplef)
-#                subfilec = open(subfile, 'w')
-#                subfilec.write('subsample '+str(subs)+'\n' )
-#                subfilec.close()
+
                 Nset=numberFile/3
                 print 'total number of scans: ',numberFile, 'in each set: ', Nset
                 upperset=[]
@@ -2020,11 +2188,17 @@ def runpredict(pp,subs,thrp, thpro,retou):
                         genebmp(namedirtopcf,scanfile,subs)
             
                 print lungSegment             
-                pavgene(namedirtopcf,'set2')
-                ILDCNNpredict(namedirtopcf,'set2')
-                visua(namedirtopcf,classdirec,True,nset)  
-                uiptree(namedirtopcf,'set2')
+                patch_list=pavgene(namedirtopcf,'set2')
+                ILDCNNpredict(namedirtopcf,'set2',patch_list)
+                visua(namedirtopcf,classdirec,True,'set2')
+                
+                patch_list=pavgene(namedirtopcf,'set0')
+                ILDCNNpredict(namedirtopcf,'set0',patch_list)
+                
+                visua(namedirtopcf,classdirec,True,'set0')  
+                uiptree(namedirtopcf)
 #                classpatch(namedirtopcf)
+                pickledir = os.path.join( namedirtopcf,picklefile[listset[0]]) 
                 spkl=os.path.join(pickledir,subsamplef)
                 data_scan=(subs,dimtabx)
                 pickle.dump(data_scan, open( spkl, "wb" ))
@@ -2032,7 +2206,7 @@ def runpredict(pp,subs,thrp, thpro,retou):
             else:  
                 for nset in listset:
                     pickledir = os.path.join( namedirtopcf,picklefile[nset])             
-                pickledir = os.path.join( namedirtopcf,picklefile)                  
+                pickledir = os.path.join( namedirtopcf,picklefile[listset[0]])                  
                 spkl=os.path.join(pickledir,subsamplef)              
                 dd = open(spkl,'rb')
                 my_depickler = pickle.Unpickler(dd)
@@ -2042,10 +2216,11 @@ def runpredict(pp,subs,thrp, thpro,retou):
                 dimtaby=dimtabx
 #                print dimtabx
                 visua(namedirtopcf,classdirec,False,nset)
-                uiptree(namedirtopcf)
+#                uiptree(namedirtopcf,'set2')
 #                classpatch(namedirtopcf)
             print('completed on: ',f)    
-            print('--------------------------------------')  
+            print('================================================')  
+            print('================================================') 
        
        (top, tail)= os.path.split(path_patient)
        for widget in cadrestatus.winfo_children():       
@@ -2053,7 +2228,7 @@ def runpredict(pp,subs,thrp, thpro,retou):
        wcadrewait = Label(cadrestatus, text="completed for "+tail,fg='darkgreen',bg='lightgreen',width=85)
        wcadrewait.pack()
 
-       runf(nset)
+       runf('set2')
     else:
     #            print 'path patient does not exist'
         wer = Label(cadrestatus, text="path for patients does not exist",\
@@ -2254,10 +2429,10 @@ cadreim.grid(row=6,  sticky=E)
 #setva()
 runl()
 
-patch_list=[]
-dataset_list=[]
-nameset_list=[]
-proba=[]
+
+#dataset_list=[]
+#nameset_list=[]
+#proba=[]
 fenetre.mainloop()
 
 #visuinter()
