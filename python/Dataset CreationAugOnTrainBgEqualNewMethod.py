@@ -198,9 +198,15 @@ category_list=os.walk( patch_dir).next()[1]
 # print what we have as categories
 print ('all actual classes:',category_list)
 print '----------'
+
+usedclassifFinal=[f for f in usedclassif if f in category_list]
+
+# print what we have as categories and in used one
+print ('all actual classes:',usedclassifFinal)
+print '----------'
 # go through all categories to calculate the number of patches per class
 # 
-for category in category_list:
+for category in usedclassifFinal:
     category_dir = os.path.join(patch_dir, category)
     print  'the path into the categories is: ', category_dir
     sub_categories_dir_list = (os.listdir(category_dir))
@@ -221,7 +227,7 @@ for category in category_list:
 
 total=0
 print('number of patches init')
-for f in category_list:
+for f in usedclassifFinal:
     print ('class:',f,classNumberInit[f])
     total=total+classNumberInit[f]
 print('total:',total)
@@ -229,7 +235,7 @@ print '----------'
 
 #define coeff
 maxl=0
-for f in category_list:
+for f in usedclassifFinal:
    if classNumberInit[f]>maxl and f !='back_ground':
       maxl=classNumberInit[f]
 print ('max number of patches in : ',maxl)
@@ -237,9 +243,9 @@ print '----------'
 #artificially clamp back-ground to maxl
 classNumberInit['back_ground']=maxl
 classConso={}
-for f in category_list:
+for f in usedclassifFinal:
   classConso[f]=float(maxl)/classNumberInit[f]
-for f in category_list:
+for f in usedclassifFinal:
     print (f,' {0:.2f}'.format (classConso[f]))
 print '----------'
 
@@ -390,7 +396,7 @@ label_listTe = []
 dataset_listTr =[]
 dataset_listV =[]
 dataset_listTe =[]
-for f in category_list:
+for f in usedclassifFinal:
      print('work on :',f)
      dataset_listTri =[]
      dataset_listVi =[]
@@ -427,7 +433,7 @@ for f in category_list:
         label_listTe.append(classif[f])
         i+=1
 print '---------------------------'
-for f in category_list:
+for f in usedclassifFinal:
     print ('init',f,classNumberInit[f])
     print ('after training',f,classNumberNewTr[f])
     print ('after validation',f,classNumberNewV[f])
@@ -483,28 +489,30 @@ print ('ytest : ',y_test.shape)
 
 
 #load to merge pickle
-recuperated_X_train = pickle.load( open( os.path.join(pickle_dirToMerge,"X_train.pkl"), "rb" ) )
-recuperated_X_test = pickle.load( open( os.path.join(pickle_dirToMerge,"X_test.pkl"), "rb" ) )
-recuperated_X_val = pickle.load( open( os.path.join(pickle_dirToMerge,"X_val.pkl"), "rb" ) )
-recuperated_y_train = pickle.load( open( os.path.join(pickle_dirToMerge,"y_train.pkl"), "rb" ) )
-recuperated_y_test = pickle.load( open( os.path.join(pickle_dirToMerge,"y_test.pkl"), "rb" ) )
-recuperated_y_val = pickle.load( open( os.path.join(pickle_dirToMerge,"y_val.pkl"), "rb" ) )
+#recuperated_X_train = pickle.load( open( os.path.join(pickle_dirToMerge,"X_train.pkl"), "rb" ) )
+recuperated_X_train = pickle.load( open( os.path.join(pickle_dirToMerge,"X_train.pkl"), "rb" ) ).tolist()
+recuperated_X_test = pickle.load( open( os.path.join(pickle_dirToMerge,"X_test.pkl"), "rb" ) ).tolist()
+recuperated_X_val = pickle.load( open( os.path.join(pickle_dirToMerge,"X_val.pkl"), "rb" ) ).tolist()
+recuperated_y_train = pickle.load( open( os.path.join(pickle_dirToMerge,"y_train.pkl"), "rb" ) ).tolist()
+recuperated_y_test = pickle.load( open( os.path.join(pickle_dirToMerge,"y_test.pkl"), "rb" ) ).tolist()
+recuperated_y_val = pickle.load( open( os.path.join(pickle_dirToMerge,"y_val.pkl"), "rb" ) ).tolist()
 #print ('recuparated 22 as example:',recuperated_X_train[22])
 print '-----------to merge----------------'
-print ('XtrainRecup :',recuperated_X_train.shape)
-print ('XvalRecup : ',recuperated_X_val.shape)
-print ('XtestRecup : ',recuperated_X_test.shape)
-print ('ytrainRecup : ',recuperated_y_train.shape)
-print ('yvalRecup : ',recuperated_y_val.shape)
-print ('ytestRecup : ',recuperated_y_test.shape)
+print ('XtrainRecup :',len (recuperated_X_train))
+print ('XvalRecup : ',len(recuperated_X_val))
+print ('XtestRecup : ',len(recuperated_X_test))
+print ('ytrainRecup : ',len(recuperated_y_train))
+print ('yvalRecup : ',len(recuperated_y_val))
+print ('ytestRecup : ',len(recuperated_y_test))
 
-X_train=X_train+recuperated_X_train
-X_test=X_test+recuperated_X_test
-X_val=X_val+recuperated_X_val
 
-y_train=y_train+recuperated_y_train
-y_test=y_test+recuperated_y_test
-y_val=y_val+recuperated_y_val
+X_train = np.array(dataset_listTr+recuperated_X_train)
+X_val = np.array(dataset_listV+recuperated_X_val)
+y_train = np.array(label_listTr+recuperated_y_train)
+y_val = np.array(label_listV+recuperated_y_val)
+X_test = np.array(dataset_listTe+recuperated_X_test)
+y_test = np.array(label_listTe+recuperated_y_test)
+
 
 print '-----------after merge----------------'
 print ('Xtrain :',X_train.shape)
