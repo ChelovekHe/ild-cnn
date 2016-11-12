@@ -1,6 +1,6 @@
 # coding: utf-8
-#Sylvain Kritter 29 mai 2016
-"""Top file to generate patches from DICOM database"""
+#Sylvain Kritter 5 octobre 2016
+"""Top file to generate patches from DICOM database equalization from cv2"""
 import os
 import numpy as np
 import shutil
@@ -16,16 +16,55 @@ import matplotlib.pyplot as plt
 #global directory for scan file
 namedirHUG = 'HUG'
 #subdir for roi in text
-#subHUG='ILD_TXT'
-subHUG='ILD_TXT'
+subHUG='ILDt'
+
+pset=0
+#########################################################
+if pset==2:
+    #picklefile    'HC', 'micronodules'
+    #patch size in pixels 32 * 32
+    dimpavx =16 
+    dimpavy = 16
+
+elif pset==0:
+    #'consolidation', 'HC','ground_glass', 'micronodules', 'reticulation'
+    #patch size in pixels 32 * 32
+    dimpavx =32
+    dimpavy = 32
+    
+elif pset==1:
+    #    'consolidation', 'ground_glass',
+    #patch size in pixels 32 * 32
+    dimpavx =28 
+    dimpavy = 28
+    
+elif pset==3:
+    #    'air_trapping'
+    #patch size in pixels 32 * 32
+    dimpavx =82 #or 20
+    dimpavy = 82
+    
+#extension for output dir
+extendir='trial2'
+#normalization internal procedure or openCV
+normiInternal=True
+#patch overlapp tolerance
+thrpatch = 0.8
+#labelEnh=('consolidation','reticulation,air_trapping','bronchiectasis','cysts')
+labelEnh=()
+# average pxixel spacing
+avgPixelSpacing=0.734
+########################################################################
+######################  end ############################################
+########################################################################
 #define the name of directory for patches
-patchesdirname = 'patches'
+patchesdirname = 'patches_'+extendir
 #define the name of directory for normalised patches
-patchesNormdirname = 'patches_norm'
+patchesNormdirname = 'patches_norm_'+extendir
 #define the name for jpeg files
-imagedirname='patches_jpeg'
+imagedirname='patches_jpeg_'+extendir
 #define name for image directory in patient directory 
-bmpname='bmp'
+bmpname='scan_bmp'
 #directory with lung mask dicom
 lungmask='lung_mask'
 #directory to put  lung mask bmp
@@ -50,26 +89,15 @@ if not os.path.exists(namedirtopc):
 # general
 #image  patch format
 typei='bmp' #can be jpg
-#dicom file size in pixels
-#some are in 768
-listOverSize=[]
-dimtabxo = 768
-dimtabyo = 768
-#others in 512
-dimtabxn = 512
-dimtabyn = 512
-#patch size in pixels 32 * 32
-dimpavxn =32
-dimpavyn = 32
-dimpavxo=48
-dimpavyo=48
-#threshold for patch acceptance
-thrpatch = 0.8
+#patch size
+
+
+font5 = ImageFont.truetype( 'arial.ttf', 5)
 font10 = ImageFont.truetype( 'arial.ttf', 10)
 font20 = ImageFont.truetype( 'arial.ttf', 20)
 labelbg='back_ground'
 locabg='anywhere'
-labelEnh=('consolidation','reticulation')
+
 #end general part
 #########################################################
 #log files
@@ -89,30 +117,92 @@ cyan=(0,255,255)
 purple=(255,0,255)
 white=(255,255,255)
 darkgreen=(11,123,96)
+pink =(255,128,255)
+lightgreen=(125,237,125)
+orange=(255,153,102)
 
 
 
-classif ={
-'back_ground':0,
-'consolidation':1,
-'fibrosis':2,
-'ground_glass':3,
-'healthy':4,
-'micronodules':5,
-'reticulation':6,
+if pset ==0:
+    usedclassif = [
+        'back_ground',
+        'consolidation',
+        'fibrosis',
+        'ground_glass',
+        'healthy',
+        'micronodules',
+        'reticulation',
+        'air_trapping',
+        'cysts'
+    #    'bronchiectasis'
+        ]
+    classif ={
+        'back_ground':0,
+        'consolidation':1,
+        'fibrosis':2,
+        'ground_glass':3,
+        'healthy':4,
+        'micronodules':5,
+        'reticulation':6,
+        'air_trapping':7,
+        'cysts':8,
+        'bronchiectasis':9,
+        
+         'bronchial_wall_thickening':10,
+         'early_fibrosis':11,
+         'emphysema':12,
+         'increased_attenuation':13,
+         'macronodules':14,
+         'pcp':15,
+         'peripheral_micronodules':16,
+         'tuberculosis':17
+        }
+elif pset==1:
+    usedclassif = [
+        'back_ground',
+        'consolidation',
+        'ground_glass',
+        'healthy',
+        'cysts'
+        ]
+        
+    classif ={
+    'back_ground':0,
+    'consolidation':1,
+    'ground_glass':2,
+    'healthy':3,
+    'cysts':4
+    }
+elif pset==2:
+        usedclassif = [
+        'back_ground',
+        'fibrosis',
+        'healthy',
+        'micronodules'
+        ,'reticulation'
+        ]
+        
+        classif ={
+    'back_ground':0,
+    'fibrosis':1,
+    'healthy':2,
+    'micronodules':3,
+    'reticulation':4,
+    }
+elif pset==3:
+    usedclassif = [
+        'back_ground',
+        'healthy',
+        'air_trapping',
+        ]
+    classif ={
+        'back_ground':0,
+        'healthy':1,
+        'air_trapping':2,
+        }
+else:
+        print 'eRROR :', pset, 'not allowed'
 
-'air_trapping':7,
- 'bronchial_wall_thickening':8,
- 'bronchiectasis':9,
- 'cysts':10,
- 'early_fibrosis':11,
- 'emphysema':12,
- 'increased_attenuation':13,
- 'macronodules':14,
- 'pcp':15,
- 'peripheral_micronodules':16,
- 'tuberculosis':17
-  }
 
 classifc ={
 'back_ground':darkgreen,
@@ -122,11 +212,11 @@ classifc ={
 'healthy':green,
 'micronodules':cyan,
 'reticulation':purple,
-
-'air_trapping':white,
+'air_trapping':pink,
+'cysts':lightgreen,
+ 'bronchiectasis':orange,
+ 
  'bronchial_wall_thickening':white,
- 'bronchiectasis':white,
- 'cysts':white,
  'early_fibrosis':white,
  'emphysema':white,
  'increased_attenuation':white,
@@ -137,22 +227,34 @@ classifc ={
  }
 #print namedirtopc
 #create patch and jpeg directory
-patchpath=os.path.join(cwdtop,patchesdirname)
+patchpath=os.path.join(path_HUG,patchesdirname)
 #create patch and jpeg directory
-patchNormpath=os.path.join(cwdtop,patchesNormdirname)
+patchNormpath=os.path.join(path_HUG,patchesNormdirname)
 #print patchpath
 #define the name for jpeg files
-jpegpath=os.path.join(cwdtop,imagedirname)
+jpegpath=os.path.join(path_HUG,imagedirname)
 #print jpegpath
+
+def remove_folder(path):
+    """to remove folder"""
+    # check if folder exists
+    if os.path.exists(path):
+         # remove if exists
+         shutil.rmtree(path)
 
 
 #patchpath = final/patches
-if not os.path.isdir(patchpath):
-    os.mkdir(patchpath)   
-if not os.path.isdir(patchNormpath):
-    os.mkdir(patchNormpath)   
-if not os.path.isdir(jpegpath):
-    os.mkdir(jpegpath)   
+remove_folder(patchpath)
+#if not os.path.isdir(patchpath):
+os.mkdir(patchpath)   
+
+remove_folder(patchNormpath)
+#if not os.path.isdir(patchNormpath):
+os.mkdir(patchNormpath)  
+
+remove_folder(jpegpath)
+#if not os.path.isdir(jpegpath):
+os.mkdir(jpegpath)   
 
 
 #end log files
@@ -168,17 +270,11 @@ def fidclass(numero):
     if not found:
         return 'unknown'
 
-def remove_folder(path):
-    """to remove folder"""
-    # check if folder exists
-    if os.path.exists(path):
-         # remove if exists
-         shutil.rmtree(path)
-
 
 def genebmp(dirName):
     """generate patches from dicom files and sroi"""
     print ('generate  bmp files from dicom files in :',f)
+    global constPixelSpacing, dimtabx,dimtaby
     #directory for patches
     bmp_dir = os.path.join(dirName, bmpname)
     remove_folder(bmp_dir)    
@@ -196,12 +292,32 @@ def genebmp(dirName):
             FilesDCM =(os.path.join(dirName,filename))  
 #           
             ds = dicom.read_file(FilesDCM)
+#            constPixelSpacing=(float(ds.PixelSpacing[0]), float(ds.PixelSpacing[1]), float(ds.SliceThickness))
+#            fxs=constPixelSpacing[0]/avgPixelSpacing
+            dsr= ds.pixel_array          
+            dsr= dsr-dsr.min()
+            c=255.0/dsr.max()
+            dsr=dsr*c
+            dsr=dsr.astype('uint8')
+    #resize the dicom to have always the same pixel/mm
+            fxs=float(ds.PixelSpacing[0])/avgPixelSpacing              
+            
+            
+            
+            
             endnumslice=filename.find('.dcm')
             imgcore=filename[0:endnumslice]+'.'+typei
 #            print imgcore
             bmpfile=os.path.join(bmp_dir,imgcore)
-            scipy.misc.imsave(bmpfile, ds.pixel_array)
-            
+#            scipy.misc.imsave(bmpfile, ds.pixel_array)
+#            imgor=cv2.imread(bmpfile)
+#            imgresize=cv2.resize(imgor,None,fx=fxs,fy=fxs,interpolation=cv2.INTER_CUBIC)
+            imgresize= scipy.misc.imresize(dsr,fxs,interp='bicubic',mode=None)            
+            scipy.misc.imsave(bmpfile,imgresize)
+#            bmpfiler=os.path.join(bmp_dir,imgcore)
+#            cv2.imwrite(bmpfile,imgresize)
+            dimtabx=imgresize.shape[0]
+            dimtaby=dimtabx
             posend=endnumslice
             while filename.find('-',posend)==-1:
                 posend-=1
@@ -212,13 +328,14 @@ def genebmp(dirName):
             orign = Image.open(bmpfile)
             imscanc= orign.convert('RGB')
             tablscan = np.array(imscanc)
-            if np.shape(tablscan)[0]==768L:
+#            if np.shape(tablscan)[0]==768L:
 #                print ('size of image:',np.shape(tablscan)[0])
-                if f not in listOverSize:
-                    print ('size of image:',np.shape(tablscan)[0])
-                    listOverSize.append(f)
+#                if f not in listOverSize:
+#                    print ('size of image:',np.shape(tablscan)[0])
+#                    listOverSize.append(f)
             scipy.misc.imsave(namescan, tablscan)
             tagviews(namescan,textw,0,20)   
+            
 #            print lungmask, filename
         
          
@@ -235,19 +352,31 @@ def genebmp(dirName):
              if ".dcm" in lungfile.lower():  # check whether the file's DICOM
                  lungDCM =os.path.join(lung_dir,lungfile)  
                  dslung = dicom.read_file(lungDCM)
+                 dsrlung= dslung.pixel_array          
+
                  endnumslice=lungfile.find('.dcm')
                  lungcore=lungfile[0:endnumslice]+'.'+typei
                  lungcoref=os.path.join(lung_bmp_dir,lungcore)
-                 scipy.misc.imsave(lungcoref, dslung.pixel_array)
+#                 scipy.misc.imsave(lungcoref, dslung.pixel_array)
+#                 lungr=cv2.imread(lungcoref)
+                 
+                 lungresize= scipy.misc.imresize(dsrlung,fxs,interp='bicubic',mode=None)            
+
+#                 lungresize=cv2.resize(lungr,None,fx=fxs,fy=fxs,interpolation=cv2.INTER_CUBIC)
+#            bmpfiler=os.path.join(bmp_dir,imgcore)
+                 np.putmask(lungresize,lungresize>0,100)
+                 scipy.misc.imsave(lungcoref,lungresize)
+#                 cv2.imwrite(lungcoref,lungresize)
                  bgdirflm=os.path.join(bgdirf,lungcore)
 #                 print lungcoref,bgdirflm
+                 
                  shutil.copyfile(lungcoref,bgdirflm)
-                 o = Image.open(bgdirflm,'r')
-                 t=np.array(o)
-#                 print bgdirflm
-                 del o
-                 np.putmask(t,t>0,100)
-                 scipy.misc.imsave(bgdirflm, t)
+#                 o = Image.open(bgdirflm,'r')
+#                 t=np.array(o)
+##                 print bgdirflm
+#                 del o
+#                 np.putmask(t,t>0,100)
+#                 scipy.misc.imsave(bgdirflm, t)
 #                 print 'end bmp'
                   
 
@@ -271,22 +400,26 @@ def normi(img):
      return tabi2
 
 
-def tagview(fig,text,x,y):
+def tagview(fig,label,x,y):
     """write text in image according to label and color"""
+#    print ('write label :',label,' at: ', fig)
     imgn=Image.open(fig)
     draw = ImageDraw.Draw(imgn)
-    col=classifc[text]
-    labnow=classif[text]
+    col=classifc[label]
+    labnow=classif[label]
 #    print (labnow, text)
-    if labnow == 0:
+    if label == 'back_ground':
         x=0
         y=0        
         deltax=0
         deltay=60
     else:        
-        deltay=25*((labnow-1)%3)
-        deltax=175*((labnow-1)//3)
-    draw.text((x+deltax, y+deltay),text,col,font=font20)
+        deltay=25*((labnow-1)%5)
+#        deltax=175*((labnow-1)//5)
+        deltax=80*((labnow-1)//5)
+
+#    print (x+deltax,y+deltay)
+    draw.text((x, y+deltay),label,col,font=font10)
     imgn.save(fig)
 
 def tagviews(fig,text,x,y):
@@ -300,16 +433,16 @@ def pavbg(namedirtopcf,dx,dy,px,py):
     print('generate back-ground for :',f)
 
     bgdirf = os.path.join(namedirtopcf, bgdir)
-    patchpathc=os.path.join(namedirtopcf,typei)
+    patchpathc=os.path.join(namedirtopcf,bmpname)
    
     lbmp=os.listdir(patchpathc)
     listbg = os.listdir(bgdirf)
-
+#    print patchpathc
     pxy=float(px*py) 
     for lm in listbg:
-        
+#        print lm
         nbp=0
-        tabp = np.zeros((dx, dy), dtype='i')
+        tabp = np.zeros((dx, dy), dtype='uint8')
 #        print ('lm:',lm)
         il1=lm.find('.bmp',0)
         j=0
@@ -331,18 +464,32 @@ def pavbg(namedirtopcf,dx,dy,px,py):
 #        print namebg
 #find the same name in bgdir directory
         origbg = Image.open(namebg,'r')
-      
+        origbl= origbg.convert('L')
+       
         for l in lbmp:
 #          print('l de pavb',l)
           if l.find(slns)>0 and slicenumber in listsliceok:
+#          if l.find(slns)>0 :
               nambmp=os.path.join(patchpathc,l)
               origbmp = Image.open(nambmp,'r')
+              origbmpl= origbmp.convert('L')
+             
 #              print ('nambmp:',nambmp)
-              tabf=np.array(origbg)
-        
+              tabf=np.array(origbl)
+#              imagemax=origbl.getbbox()
+#                                            
+#              min_val=np.min(origbl)
+#              max_val=np.max(origbl)
+#              print min_val, max_val
+#              cv2.imshow('tabf',tabf) 
+##
+#              cv2.waitKey(0)    
+#              cv2.destroyAllWindows()   
         #put all to 1 if>0
+              tabfc = np.copy(tabf)
               nz= np.count_nonzero(tabf)
               if nz>0:
+
                 np.putmask(tabf,tabf>0,1)
                 atabf = np.nonzero(tabf)
                 #tab[y][x]  convention
@@ -356,7 +503,7 @@ def pavbg(namedirtopcf,dx,dy,px,py):
                 ymin=0
                 ymax=0
     
-              tabfc = np.copy(tabf)
+              
               i=xmin
               while i <= xmax:
                         j=ymin
@@ -366,39 +513,39 @@ def pavbg(namedirtopcf,dx,dy,px,py):
                             
                             tabpatch=tabf[j:j+py,i:i+px]
                             area= tabpatch.sum()
-                                              
+                           
                             if float(area)/pxy >thrpatch:
-    #                             print 'good'
+#                                 print 'good'
     #                            good patch
         #                   
-                                 crorig = origbmp.crop((i, j, i+px, j+py))
+                                 crorig = origbmpl.crop((i, j, i+px, j+py))
                                  #detect black pixels
                                  #imagemax=(crorig.getextrema())
                                  imagemax=crorig.getbbox()
+#                                 print imagemax
         #                          
                                  if imagemax!=None:
                                     nbp+=1
                                     nampa='/'+labelbg+'/'+locabg+'/'+f+'_'+slicenumber+'_'+str(nbp)+'.'+typei 
-    #                                print nampa   
-    #                                crorig.save(patchpath+nampa)
-                                    if f in listOverSize:
-                                        ncr=crorig.resize((dimpavxn,dimpavyn),PIL.Image.ANTIALIAS)
-                                        ncr.save(patchpath+nampa)
-        #normalize patches and put in patches_norm
-                                        tabi2=normi(ncr)
-                                        scipy.misc.imsave(patchNormpath+nampa, tabi2)
+ 
+                                    crorig.save(patchpath+nampa)
+                                    
+                                    imgray =np.array(crorig)
+#                                    imgray = cv2.cvtColor(imgra,cv2.COLOR_BGR2GRAY)
+                                            #normalization internal procedure or openCV
+                                    if normiInternal:
+                                        tabi2 = normi(imgray) 
                                     else:
-                                        crorig.save(patchpath+nampa)
-        #normalize patches and put in patches_norm
-                                        tabi2=normi(crorig)
-                                        scipy.misc.imsave(patchNormpath+nampa, tabi2)
+                                        tabi2 = cv2.equalizeHist(imgray)  
+                                      
+                                    scipy.misc.imsave(patchNormpath+nampa, tabi2)
                                 
                                     x=0
                                     #we draw the rectange
                                     while x < px:
                                         y=0
                                         while y < py:
-                                            tabp[y+j][x+i]=4
+                                            tabp[y+j][x+i]=150
                                             if x == 0 or x == px-1 :
                                                 y+=1
                                             else:
@@ -409,6 +556,12 @@ def pavbg(namedirtopcf,dx,dy,px,py):
                             j+=1
                         i+=1
                 
+#              print tabfc.shape , tabfc.dtype    
+#              cv2.imshow('tabfc',tabfc) 
+###
+#              cv2.waitKey(0)    
+#              cv2.destroyAllWindows()  
+#              print tabp.shape , tabp.dtype 
               tabpw =tabfc+tabp
               scipy.misc.imsave(jpegpath+'/'+f+'_slice_'+slicenumber+\
         '_'+labelbg+'_'+locabg+'.jpg', tabpw) 
@@ -417,10 +570,12 @@ def pavbg(namedirtopcf,dx,dy,px,py):
 #        mfl=open(jpegpath+'/'+f+'_'+slicenumber+'.txt',"w")
               mfl.write('#number of patches: '+str(nbp)+'\n')
               mfl.close()
+              break
 
 def contour2(im,l):  
     col=classifc[l]
 #    print l
+#    print 'dimtabx' , dimtabx
     vis = np.zeros((dimtabx,dimtaby,3), np.uint8)
     imgray = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
     ret,thresh = cv2.threshold(imgray,0,255,0)
@@ -435,14 +590,16 @@ def contour2(im,l):
 def pavs (imgi,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
     iln,f,label,loca,typei,errorfile):
     """ generate patches from ROI"""
-
+#    print 'pavement'
     vis=contour2(imgi,label)
+     
     
     bgdirf = os.path.join(namedirtopcf, bgdir)
-    patchpathc=os.path.join(namedirtopcf,typei)
+    
+    patchpathc=os.path.join(namedirtopcf,bmpname)
 #    print patchpathc
     contenujpg = os.listdir(patchpathc)
-    #directory with lung mask dicom
+    #directory with scan mask dicom
     #contenujpg in  final/ILD_DB_txtROIs/35/bmp
     debnumslice=iln.find('_')+1
     endnumslice=iln.find('_',debnumslice)
@@ -457,6 +614,10 @@ def pavs (imgi,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
     elif int(slicenumber)<10000:
           slns=slicenumber+'.'+typei
     tabp = np.zeros((dx, dy), dtype='i')
+#    min_val=np.min(tab)
+#    max_val=np.max(tab)
+#    print min_val, max_val
+    np.putmask(tab,tab>0,100)
     tabf = np.copy(tab)
     np.putmask(tabf,tabf>0,1)
     pxy=float(px*py)
@@ -466,7 +627,7 @@ def pavs (imgi,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
     errorliststring=[]
 
     lung_dir1 = os.path.join(namedirtopcf, lungmask)
-#            print lung_dir
+#    print lung_dir1
     lung_bmp_dir = os.path.join(lung_dir1,lungmaskbmp)
     lunglist = os.listdir(lung_bmp_dir)
     atabf = np.nonzero(tabf)
@@ -478,7 +639,7 @@ def pavs (imgi,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
     for  n in contenujpg:           
         #                    print(slns)
         if n.find(slns)>0:
-            namebmp=namedirtopcf+'/'+typei+'/'+n   
+            namebmp=os.path.join(patchpathc,n)
             namescan=os.path.join(sroidir,n)   
 #            namebmp=namedirtopcf+'/'+typei+'/'+n
             orig = Image.open(namebmp)
@@ -487,14 +648,12 @@ def pavs (imgi,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
             imscanc= orign.convert('RGB')
            
             tablscan = np.array(imscanc)
+            
             imn=cv2.add(vis,tablscan)
             imn = cv2.cvtColor(imn, cv2.COLOR_BGR2RGB)
-#            tabcolor=mergcolor(tablscan,newtab)
-#            print('1')
+
             cv2.imwrite(namescan,imn)
-#            print namescan
-#            scipy.misc.imsave(namescan, tabcolor)
-#            namebg=f+slicenumber+'.jpg'
+
             for lm in lunglist:
 #                print lunglist
 #                print slin
@@ -502,29 +661,50 @@ def pavs (imgi,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
                     #look in lung maask the name of slice
 
                     namebg=os.path.join(bgdirf,lm)
+#                    print ('namebg:',namebg)
 #find the same name in bgdir directory
-                    origbg = Image.open(namebg,'r')
-                    tabhc=np.array(origbg)
-                    np.putmask(tabhc,tabhc>0,200)
+#                    origbg = Image.open(namebg,'r')
+#                    tabhc=np.array(origbg)
+                    tabhc=cv2.imread(namebg,0)
+                    np.putmask(tabhc,tabhc>0,100)
+                    imgray = cv2.cvtColor(imgi,cv2.COLOR_BGR2GRAY)
+                    tabf=np.array(imgray)
+#                    print tabf.shape,tabhc.shape
+                    np.putmask(tabf,tabf>0,100)
+                    mask=cv2.bitwise_not(tabf)
+    #                    cv2.imshow('masky',masky) 
+    #                    print np.shape(tabhc), np.shape(masky)
+                    outy=cv2.bitwise_and(tabhc,mask)                                        
 
-#                    print slicenumber
-                    del origbg
-                    masky=cv2.inRange(imgi,(1,1,1),(1,1,1))
-                    np.putmask(masky,masky>0,200)
-                    outy=cv2.bitwise_xor(tabhc,masky)
-                    
                     cv2.imwrite(namebg,outy)
+                    
+                    
+#                    cv2.imshow('imgi',imgi) 
+#                    cv2.imshow('vis',vis) 
+#                    cv2.imshow('tabhc',tabhc) 
+#                    cv2.imshow('imn',imn) 
+#                    cv2.imshow('outy',outy) 
+#
+#                    cv2.waitKey(0)    
+#                    cv2.destroyAllWindows()                    
+#                    
+                    
+                    
 
-            tagview(namescan,label,175,00)
+            tagview(namescan,label,0,100)
+#            print 'tagview1', namescan, label
             if slicenumber not in listsliceok:
                  listsliceok.append(slicenumber) 
             i=xmin
+            np.putmask(tabf,tabf==1,0)
+            np.putmask(tabf,tabf>0,1)
             while i <= xmax:
                 j=ymin
                 while j<=ymax:
                     tabpatch=tabf[j:j+py,i:i+px]
                     area= tabpatch.sum()  
                     targ=float(area)/pxy
+#                    print area  ,pxy
 #                    if label in labelEnh:
 #                        thr1=thr*1.05
 #                        thr2=thr*1.1
@@ -555,17 +735,28 @@ def pavs (imgi,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
                         else:
                             nbp+=1
                             nampa='/'+label+'/'+loca+'/'+f+'_'+iln+'_'+str(nbp)+'.'+typei 
-                            if f in listOverSize:
-#                                 print'oversize for pav'                               
-                                 imgr=crorig.resize((dimpavxn,dimpavyn), PIL.Image.ANTIALIAS)
-                                 imgr.save(patchpath+nampa)
-                                 tabi2=normi(imgr)
-                                 scipy.misc.imsave(patchNormpath+nampa, tabi2)
+#                            if f in listOverSize:
+##                                 print'oversize for pav'                               
+#                                 imgr=crorig.resize((dimpavxn,dimpavyn), PIL.Image.ANTIALIAS)
+#                                 imgr.save(patchpath+nampa)
+##                                 tabi2=normi(imgr)
+#                                 imgray =np.array(imgr)
+##                                 imgray = cv2.cvtColor(imgr,cv2.COLOR_BGR2GRAY)
+#                                 tabi2 = cv2.equalizeHist(imgray)
+#
+#                                 scipy.misc.imsave(patchNormpath+nampa, tabi2)
+#                            else:
+                            crorig.save(patchpath+nampa) 
+        #normalize patches and put in patches_norm
+        #                                 tabi2=normi(crorig)
+                            imgray =np.array(crorig)
+#                            imgray = cv2.cvtColor(imgra,cv2.COLOR_BGR2GRAY)
+                            if normiInternal:
+                                        tabi2 = normi(imgray) 
                             else:
-                                 crorig.save(patchpath+nampa) 
-#normalize patches and put in patches_norm
-                                 tabi2=normi(crorig)
-                                 scipy.misc.imsave(patchNormpath+nampa, tabi2)
+                                        tabi2 = cv2.equalizeHist(imgray)  
+#                            tabi2 = cv2.equalizeHist(imgray)
+                            scipy.misc.imsave(patchNormpath+nampa, tabi2)
                             
                         #                print('pavage',i,j)  
                             strpac=strpac+str(i)+' '+str(j)+'\n'
@@ -574,7 +765,7 @@ def pavs (imgi,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
                             while x < px:
                                 y=0
                                 while y < py:
-                                    tabp[y+j][x+i]=4
+                                    tabp[y+j][x+i]=150
                                     if x == 0 or x == px-1 :
                                         y+=1
                                     else:
@@ -801,17 +992,17 @@ for f in listdirc:
                 contenudir = os.listdir(namedirtopcf)
                 break
         genebmp(namedirtopcf)
-        if f in listOverSize:
-            print(f,' is more than 512')
-            dimtabx=dimtabxo
-            dimtaby=dimtabyo
-            dimpavx=dimpavxo
-            dimpavy=dimpavyo
-        else:
-            dimtabx = dimtabxn
-            dimtaby = dimtabyn
-            dimpavx=dimpavxn
-            dimpavy=dimpavyn
+#        if f in listOverSize:
+#            print(f,' is more than 512')
+#            dimtabx=dimtabxo
+#            dimtaby=dimtabyo
+#            dimpavx=dimpavxo
+#            dimpavy=dimpavyo
+#        else:
+#            dimtabx = dimtabxn
+#            dimtaby = dimtabyn
+#            dimpavx=dimpavxn
+#            dimpavy=dimpavyn
 #        print('just after')
         for f1 in contenudir:
             
@@ -826,6 +1017,7 @@ for f in listdirc:
                 #pathf1=final/ILD_DB_txtROIs/35/CT-INSPIRIUM-1186.txt
              
                 labell,coefi =fileext(pathf1,namedirtopcf,patchpath)
+#                print 'coeeficient: ',coefi
 #                print(label,loca)
 #                for ff in labell:
 #                    print ff
@@ -874,7 +1066,9 @@ for f in listdirc:
                     loca=t[locaposdeb:locaposend].strip()
 #                print(label,loca)
                 #print(tabcff,coefi)
-                    tabccfi=tabcff/coefi
+                    tabccfi=tabcff/avgPixelSpacing
+#                    tabccfi=tabcff/coefi
+
 #                print(tabccfi)
                     tabc=tabccfi.astype(int)
                     
@@ -888,12 +1082,13 @@ for f in listdirc:
                     il=l.find('.',0)
                     iln=l[0:il]
 #                    print iln
-#            print('c :',c, label,loca)
-            print('creates patches from:',iln, 'in:', f)
-            nbp,tabz1=pavs (imgc,tabzc,dimtabx,dimtaby,dimpavx,dimpavy,namedirtopcf,\
-                jpegpath, patchpath,thrpatch,iln,f,label,loca,typei,errorfile)
-            print('end create patches')
-            nbpf=nbpf+nbp
+            if label in usedclassif:
+                print('c :',c, label,loca)
+                print('creates patches from:',iln, 'in:', f)
+                nbp,tabz1=pavs (imgc,tabzc,dimtabx,dimtaby,dimpavx,dimpavy,namedirtopcf,\
+                    jpegpath, patchpath,thrpatch,iln,f,label,loca,typei,errorfile)
+                print('end create patches')
+                nbpf=nbpf+nbp
             #create patches for back-ground
         pavbg(namedirtopcf,dimtabx,dimtaby,dimpavx,dimpavy)
 #    print(f,nbpf)
