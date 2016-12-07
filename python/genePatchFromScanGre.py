@@ -20,10 +20,24 @@ import matplotlib.pyplot as plt
 namedirHUG = 'CHU'
 #subdir for roi in text
 subHUG='UIP'
+
+
 toppatch= 'TOPPATCH'
     
 #extension for output dir
-extendir='16_set0'
+extendir='16_set0_gci'
+#extendir='essai'
+#normalization internal procedure or openCV
+normiInternal=True
+globalHist=True #use histogram equalization on full image
+globalHistInternal=False #use internal for global histogram when True otherwise opencv
+#patch overlapp tolerance
+thrpatch = 0.8
+#labelEnh=('consolidation','reticulation,air_trapping','bronchiectasis','cysts')
+labelEnh=()
+# average pxixel spacing
+avgPixelSpacing=0.734
+imageDepth=255 #number of bits used on dicom images (2 **n)
 
 pset=0
 #########################################################
@@ -51,15 +65,7 @@ elif pset==3:
     dimpavx =82 #or 20
     dimpavy = 82
 
-#normalization internal procedure or openCV
-normiInternal=True
-#patch overlapp tolerance
-thrpatch = 0.8
-#labelEnh=('consolidation','reticulation,air_trapping','bronchiectasis','cysts')
-labelEnh=()
-# average pxixel spacing
-avgPixelSpacing=0.734
-imageDepth=255 #number of bits used on dicom images (2 **n)
+
 ########################################################################
 ######################  end ############################################
 ########################################################################
@@ -113,9 +119,9 @@ locabg='anywhere_CHUG'
 #########################################################
 #log files
 ##error file
-errorfile = open(namedirtopc+'genepatcherrortop.txt', 'w')
+errorfile = open(namedirtopc+'_'+extendir+'_genepatcherrortop.txt', 'w')
 #filetowrite=os.path.join(namedirtopc,'lislabel.txt')
-mflabel=open(namedirtopc+'lislabel.txt',"w")
+mflabel=open(namedirtopc+'_'+extendir+'_lislabel.txt',"w")
 
 #end customisation part for datataprep
 #######################################################
@@ -145,7 +151,8 @@ if pset ==0:
         'reticulation',
         'air_trapping',
         'cysts',
-        'bronchiectasis'
+        'bronchiectasis',
+        'emphysema'
         ]
     classif ={
         'back_ground':0,
@@ -257,21 +264,21 @@ def remove_folder(path):
 
 
 #patchpath = final/patches
-remove_folder(patchtoppath)
-#if not os.path.isdir(patchpath):
-os.mkdir(patchtoppath)   
+#remove_folder(patchtoppath)
+if not os.path.isdir(patchtoppath):
+    os.mkdir(patchtoppath)   
 
-remove_folder(patchpath)
-#if not os.path.isdir(patchpath):
-os.mkdir(patchpath)   
+#remove_folder(patchpath)
+if not os.path.isdir(patchpath):
+    os.mkdir(patchpath)   
 
-remove_folder(patchNormpath)
-#if not os.path.isdir(patchNormpath):
-os.mkdir(patchNormpath)  
+#remove_folder(patchNormpath)
+if not os.path.isdir(patchNormpath):
+    os.mkdir(patchNormpath)  
 
-remove_folder(jpegpath)
-#if not os.path.isdir(jpegpath):
-os.mkdir(jpegpath)   
+#remove_folder(jpegpath)
+if not os.path.isdir(jpegpath):
+    os.mkdir(jpegpath)   
 
 
 #end log files
@@ -309,6 +316,7 @@ def genebmp(dirName):
     
     global constPixelSpacing, dimtabx,dimtaby, source_name
     contenudir = os.listdir(dirName)
+    print 'dirName',dirName
     bgdirf = os.path.join(dirName, bgdir)
     remove_folder(bgdirf)    
     os.mkdir(bgdirf)
@@ -317,27 +325,28 @@ def genebmp(dirName):
         print dirFile
         rotScan=False
         dirFileP = os.path.join(dirName, dirFile)
-        
+#        source_name=''
         if dirFile == 'source':
             source_name='source'
         if dirFile == 'B70f':
             source_name='B70f'
             dn=True
             rotScan=True
-        
+#        print 'source_name',source_name
         if dirFile not in reserved:        
             bmp_dir = os.path.join(dirFileP, bmpname)
             remove_folder(bmp_dir)    
             os.mkdir(bmp_dir)
         if dirFile not in reserved +usedclassif+notclas :
             print 'not known:',dirFile
+            print usedclassif
             errorfile.write(dirFile+' directory is not known\n')
         #list dcm files
-        fileList = os.listdir(dirFileP)
+        fileList =[name for name in  os.listdir(dirFileP) if ".dcm" in name.lower()]
     
         for filename in fileList:
             
-            if ".dcm" in filename.lower():  # check whether the file's DICOM
+#            if ".dcm" in filename.lower():  # check whether the file's DICOM
                 FilesDCM =(os.path.join(dirFileP,filename))  
 #                print FilesDCM         
                 RefDs = dicom.read_file(FilesDCM) 
@@ -352,15 +361,26 @@ def genebmp(dirName):
                     else:
                         dsr=dsr.astype('uint16')
                     #resize the dicom to have always the same pixel/mm
-                    fxs=float(RefDs.PixelSpacing[0])/avgPixelSpacing   
-    
-                    dsrresize= sp.misc.imresize(dsr,fxs,interp='bicubic',mode=None)
-    
+                    fxs=float(RefDs.PixelSpacing[0])/avgPixelSpacing       
+                    dsrresize1= sp.misc.imresize(dsr,fxs,interp='bicubic',mode=None)
+                    if dirFile=='source' or dirFile=='B70f':
+                        if globalHist:
+                            if globalHistInternal:
+                                dsrresize = normi(dsrresize1) 
+                            else:
+                                dsrresize = cv2.equalizeHist(dsrresize1) 
+                        else:
+                            dsrresize=dsrresize1 
+                    else:
+                            dsrresize=dsrresize1                    
+   
                     #calculate the  new dimension of scan image
                     dimtabx=int(dsrresize.shape[0])
-                    dimtaby=int(dsrresize.shape[1])               
+                    dimtaby=int(dsrresize.shape[1])                     
+                    scanNumber=int(RefDs.InstanceNumber)
                     endnumslice=filename.find('.dcm')
-                    imgcore=filename[0:endnumslice]+'.'+typei
+                   
+                    imgcore=filename[0:endnumslice]+'_'+str(scanNumber)+'.'+typei   
                     bmpfile=os.path.join(bmp_dir,imgcore)
                     if rotScan :
                         dsrresize=rotateImage(dsrresize, 180)
@@ -371,24 +391,15 @@ def genebmp(dirName):
                         scipy.misc.imsave(bmpfile, dsrresize)
                         
                     if dirFile == 'B70f' or dirFile =='source':
-    #                    print 'azfter tail',tail,f
-    #                    posend=endnumslice
-    #                    while filename.find('-',posend)==-1:
-    #                        posend-=1
-    #                    debnumslice=posend+1
-                        slicenumber=rsliceNum(filename,'-','.dcm')
-                        namescan=os.path.join(sroidir,imgcore)                   
-                        textw='n: '+f+' scan: '+str(slicenumber)
-                        orign = Image.open(bmpfile)
-                        imscanc= orign.convert('RGB')
-                        tablscan = np.array(imscanc)
+#                        slicenumber=int(RefDs.InstanceNumber)
+                        namescan=os.path.join(sroidir,imgcore)                        
+                        textw='n: '+f+' scan: '+str(scanNumber)
+                        if rotScan :
+                            dsrresize1=rotateImage(dsrresize1, 180)
+                        tablscan=cv2.cvtColor(dsrresize1,cv2.COLOR_GRAY2BGR)
                         scipy.misc.imsave(namescan, tablscan)
-                        tagviews(namescan,textw,0,20)   
-#    print 'rotscan:',rotScan    
+                        tagviews(namescan,textw,0,20)    
     return dn 
-
-
-
 
 def reptfulle(tabc,dx,dy):
     imgi = np.zeros((dx,dy,3), np.uint8)
@@ -397,15 +408,16 @@ def reptfulle(tabc,dx,dy):
     tabzi = np.array(imgi)
     tabz = tabzi[:, :,1]   
     return tabz, imgi
-    
-
 
 def normi(img):
      tabi = np.array(img)
 #     print(tabi.min(), tabi.max())
      tabi1=tabi-tabi.min()
 #     print(tabi1.min(), tabi1.max())
-     tabi2=tabi1*(imageDepth/float(tabi1.max()-tabi1.min()))
+     maxt=float(tabi1.max())
+     if maxt==0:
+         maxt=1
+     tabi2=tabi1*(imageDepth/maxt)
      if imageDepth<256:
          tabi2=tabi2.astype('uint8')
      else:
@@ -477,24 +489,12 @@ def pavbg(dirName,dn):
 #        print lm
         nbp=0
         tabp = np.zeros((dimtabx, dimtaby), dtype='uint8')
-        slicenumber=rsliceNum(lm,'-','.'+typei)
-#        endnumslice=lm.find('.'+typei)
-#        posend=endnumslice
-#        while lm.find('-',posend)==-1:
-#                        posend-=1
-#        debnumslice=posend+1
-#        slicenumber=int((lm[debnumslice:endnumslice])) 
+        slicenumber=rsliceNum(lm,'_','.'+typei)
         if dn:
             slicenumber=2*slicenumber
         for ln in  lbmp:
-            slicescan=rsliceNum(ln,'-','.'+typei)
-#            endnumslice=ln.find('.'+typei)
-#            posend=endnumslice
-#            while ln.find('-',posend)==-1:
-#                        posend-=1
-#            debnumslice=posend+1
-#            slicescan=int((ln[debnumslice:endnumslice])) 
-#            print slicescan,slicenumber
+            slicescan=rsliceNum(ln,'_','.'+typei)
+
             if slicescan==slicenumber and slicescan in listsliceok:
         
                   nambmp=os.path.join(patchpathc,ln)
@@ -540,37 +540,34 @@ def pavbg(dirName,dn):
                     xmin=0
                     xmax=0
                     ymin=0
-                    ymax=0
-        
-                  
+                    ymax=0        
                   i=xmin
                   while i <= xmax:
                             j=ymin
                             while j<=ymax:
         #                        if i%10==0 and j%10==0:
-        #                         print(i,j)
-                                
+        #                         print(i,j)                                
                                 tabpatch=tabf[j:j+dimpavy,i:i+dimpavx]
                                 area= tabpatch.sum()
     #                            print area  
                                 if float(area)/pxy >thrpatch:
     #                                 print 'good'
-        #                            good patch
-            #                   
+        #                            good patch                   
                                      crorig = origbmpl.crop((i, j, i+dimpavx, j+dimpavy))
                                      #detect black pixels
-                                     #imagemax=(crorig.getextrema())
                                      imagemax=crorig.getbbox()
     #                                 print imagemax
-            #                          
-                                     if imagemax!=None:
+                                     nim= np.count_nonzero(crorig)
+                                     if nim>0:
+                                         min_val=np.min(crorig)
+                                         max_val=np.max(crorig)         
+                                     else:
+                                         min_val=0
+                                         max_val=0  
+                                     if imagemax!=None and min_val!=max_val:
                                         nbp+=1
-                                        nampa=os.path.join(nampadirl,tail+'_'+str(slicenumber)+'_'+str(nbp)+'.'+typei )
-
-#                                        nampa='/'+labelbg+'/'+locabg+'/'+f+'_'+slicenumber+'_'+str(nbp)+'.'+typei 
-     
-                                        crorig.save(nampa)
-                                        
+                                        nampa=os.path.join(nampadirl,tail+'_'+str(slicenumber)+'_'+str(nbp)+'.'+typei )   
+                                        crorig.save(nampa)                                        
                                         imgray =np.array(crorig)
     #                                    imgray = cv2.cvtColor(imgra,cv2.COLOR_BGR2GRAY)
                                                 #normalization internal procedure or openCV
@@ -643,7 +640,7 @@ def pavs (dirName,dn):
 #    contenudir = os.listdir(dirName)
     pxy=float(dimpavx*dimpavy)
     contenudir=[name for name in os.listdir(dirName) if name  in usedclassif]
-    print contenudir
+#    print contenudir
     for dirFile in contenudir :
         dirFileP = os.path.join(dirName, dirFile)
         #directory for patches
@@ -667,15 +664,9 @@ def pavs (dirName,dn):
         #list file in roi directory
         listmroi = os.listdir(dirFilePs)
         for filename in listmroi:
-             
-             endnumslice=filename.find('.'+typei)
-             posend=endnumslice
-             while filename.find('-',posend)==-1:
-                    posend-=1
-             debnumslice=posend+1
-             slicenumber=int((filename[debnumslice:endnumslice])) 
-              
-#                 print 'number of roi:',slicenumber
+
+             slicenumber= rsliceNum(filename,'_','.'+typei)
+
              if dn:
                  slicenumber=2*slicenumber
 
@@ -684,13 +675,9 @@ def pavs (dirName,dn):
              #list slice in source
              listslice = os.listdir(imgsp_dir)
              for l in listslice:
-#                    print 'list file in source',l
-                posend=endnumslice
-                while l.find('-',posend)==-1:
-                    posend-=1
-                debnumslice=posend+1
-                slicescan=int((l[debnumslice:endnumslice])) 
-#                    print slicenumber,slicescan
+
+                slicescan= rsliceNum(l,'_','.'+typei)
+
 
                 if slicescan==slicenumber:
                      tabp = np.zeros((dimtabx, dimtaby), dtype='i')
@@ -715,19 +702,14 @@ def pavs (dirName,dn):
                          listsroi =os.listdir(sroidir)
                          
                          for sroi in listsroi:
-#                                 print 'file in directory sroi:',sroi
-                             endnumslice=filename.find('.'+typei)
-                             posend=endnumslice
-                             while sroi.find('-',posend)==-1:
-                                 posend-=1
-                             debnumslice=posend+1
-                             sliceroi=int((sroi[debnumslice:endnumslice])) 
+                             sliceroi= rsliceNum(sroi,'_','.'+typei) 
 #                             print slicescan,sliceroi
                              if sliceroi==slicenumber:
                                  filenamesroi = os.path.join(sroidir, sroi)
                                  oriroi = Image.open(filenamesroi)
                                  imroi= oriroi.convert('RGB')           
                                  tablroi = np.array(imroi)
+#                                 print vis.shape,tablroi.shape
                                  imn=cv2.add(vis,tablroi)
                                  imn = cv2.cvtColor(imn, cv2.COLOR_BGR2RGB)
                                  cv2.imwrite(filenamesroi,imn)
@@ -743,14 +725,8 @@ def pavs (dirName,dn):
                      #list slice in bgdir
                      lunglist =os.listdir(bgdirf)                         
                      for lm in lunglist:
+                         slicelung= rsliceNum(lm,'_','.'+typei) 
 #                             print ' list file in bgdir', lm
-                         endnumslice=lm.find('.'+typei)
-                         posend=endnumslice
-#                             print posend
-                         while lm.find('-',posend)==-1:
-                             posend-=1
-                         debnumslice=posend+1
-                         slicelung=int((lm[debnumslice:endnumslice])) 
                          if dn:
                              slicelung=2*slicelung
 #                             print slicelung,slicenumber
@@ -771,6 +747,7 @@ def pavs (dirName,dn):
 #                                masky=cv2.inRange(tabf,(1,1,1),(10,10,10))
 #                    np.putmask(imgi,imgi>1,200)
                             np.putmask(tabf,tabf==1,0)
+#                            tabf1 = np.where(tabf> 1,100,0)
                             np.putmask(tabf,tabf>0,100)
                            
 #                                np.putmask(tabu,tabu==2,100)
@@ -780,9 +757,8 @@ def pavs (dirName,dn):
 #                                cv2.destroyAllWindows()
                             mask=cv2.bitwise_not(tabf)
 #                    cv2.imshow('masky',masky) 
-#                    print np.shape(tabhc), np.shape(masky)
+#                            print np.shape(tabhc), np.shape(mask),np.shape(tabf1)
                             outy=cv2.bitwise_and(tabhc,mask)
-                    
                             cv2.imwrite(namebg,outy)
                             break
  
@@ -806,9 +782,13 @@ def pavs (dirName,dn):
 #                 imgmask=cv2.imread(filenamec)
 #                 tabimgmask=np.array(imgmask)
                  
-                     
-                     np.putmask(tabf,tabf==1,0)  
+#                     
+#                     np.putmask(tabf,tabf==1,0)  
+#                     np.putmask(tabf,tabf>0,1)
+                     np.putmask(tabf,tabf==1,0)
+#                            tabf1 = np.where(tabf> 1,100,0)
                      np.putmask(tabf,tabf>0,1)
+#                     tabf = np.where(tabf> 1,1,0)
 #                         tabu=np.copy(tabf)
 #                         np.putmask(tabu,tabu>0,150)
 #                         cv2.imshow('tabu',tabu) 
@@ -842,12 +822,15 @@ def pavs (dirName,dn):
                                  #detect black pixels
                                  #imagemax=(crorig.getextrema())
                                 imagemax=crorig.getbbox()
-                             
-                                if imagemax!=None:
-  
-                                    nbp+=1
-
-                                   
+                                nim= np.count_nonzero(crorig)
+                                if nim>0:
+                                     min_val=np.min(crorig)
+                                     max_val=np.max(crorig)         
+                                else:
+                                     min_val=0
+                                     max_val=0                              
+                                if imagemax!=None and min_val!=max_val:   
+                                    nbp+=1                                   
                                     nampa=os.path.join(nampadirl,tail+'_'+str(slicenumber)+'_'+str(nbp)+'.'+typei )
                                     crorig.save(nampa) 
                 #normalize patches and put in patches_norm
@@ -913,8 +896,9 @@ def pavs (dirName,dn):
 
 listdirc= (os.listdir(namedirtopc))
 npat=0
+#listdirc=('S335940',)
 for f in listdirc:
-    #f = 35
+#    f = 'S335940'
     print('work on:',f)
 
     nbpf=0
