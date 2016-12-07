@@ -2,10 +2,11 @@
 '''create dataset from patches using split into 3 bmp databases and
  augmentation only on training, using bg, bg number limited to max and with equalization
  for all in training, validation and test
- defined used pattern set
+ defined used pattern set, define upsampling
  '''
 import os
-import dircache
+import cv2
+#import dircache
 import sys
 import shutil
 from scipy import misc
@@ -17,36 +18,53 @@ import random
 
 #####################################################################
 #define the working directory
-HUG='CHU'   
+HUG='HUG'   
+subDir='TOPPATCH'
+#extent='essai'
+extent='16_set0_gci'
+#extent='16_set0g'
 
-
-
+hugeClass=['healthy','back_ground']
+#hugeClass=['back_ground']
+upSampling=10 # define thershold for up sampling in term of ration compared to max class
+subDirc=subDir+'_'+extent
+pickel_dirsource='pickle_ds37'
+name_dir_patch='patches_norm'
 #output pickle dir with dataset   
-pickel_dirsource='pickle_ds24'
-
-
-#input pickle dir with dataset to merge
-pickel_dirsourceToMerge='pickle_ds22'
-
-
-#input patch directory
-patch_dirsource=os.path.join('TOPPATCH_16_set0','patches_norm')
-
-#output database for database generation
-patch_dirSplitsource=   'chu16set0'
-
+augf=12
 
 #define the pattern set
 pset=0
+#stdMean=True #use mean and normalization for each patch
+maxuse=True # True means that all class are upscalled to have same number of 
+ #elements, False means that all classes are aligned with the minimum number
+useWeight=True #True means that no upscaling are done, but classes will 
+#be weighted ( back_ground and healthy clamped to max) 
 
-###############################################################
+subdirc=subDir+'_'+extent
 cwd=os.getcwd()
 (cwdtop,tail)=os.path.split(cwd)
 dirHUG=os.path.join(cwdtop,HUG)
+dirHUG=os.path.join(dirHUG,subDirc)
+print 'dirHUG', dirHUG
+#input pickle dir with dataset to merge
+#pickel_dirsourceToMerge='pickle_ds22'
+
+
+#input patch directory
+#patch_dirsource=os.path.join(dirHUG,'patches_norm_16_set0_1')
+patch_dirsource=os.path.join(dirHUG,name_dir_patch)
+print 'patch_dirsource',patch_dirsource
+#output database for database generation
+patch_dirSplitsource=   'b'
+#augmentation factor
+
+
+###############################################################
 
 
 pickle_dir=os.path.join(cwdtop,pickel_dirsource) 
-pickle_dirToMerge=os.path.join(cwdtop,pickel_dirsourceToMerge)  
+#pickle_dirToMerge=os.path.join(cwdtop,pickel_dirsourceToMerge)  
 
 
 patch_dir=os.path.join(dirHUG,patch_dirsource)
@@ -163,12 +181,8 @@ elif pset==3:
 else:
         print 'eRROR :', pset, 'not allowed'
 
+class_weights={}
 
-
-#print (usedclassif)
-
-#augmentation factor
-augf=6
 #define a dictionary with labels
 #classif={}
 #i=0
@@ -183,12 +197,14 @@ classNumberNewTr={}
 classNumberNewV={}
 classNumberNewTe={}
 actualClasses=[]
+classAugm={}
 
 for f in usedclassif:
     classNumberInit[f]=0
     classNumberNewTr[f]=0
     classNumberNewV[f]=0
     classNumberNewTe[f]=0
+    classAugm[f]=1
 
 # list all directories under patch directory. They are representing the categories
 
@@ -215,12 +231,10 @@ for category in usedclassifFinal:
         subCategory_dir = os.path.join(category_dir, subCategory)
         print  'the path into the sub categories is: ',subCategory_dir
         #print subCategory_dir
-        image_files = (os.listdir(subCategory_dir))
+        image_files = [name for name in os.listdir(subCategory_dir) if name.find('.bmp') > 0 ]
         
        
         for filei in image_files:
-            
-            if filei.find('.bmp') > 0:
                 
                 classNumberInit[category]=classNumberInit[category]+1
 
@@ -233,22 +247,45 @@ for f in usedclassifFinal:
 print('total:',total)
 print '----------'
 
-#define coeff
+#define coeff max
 maxl=0
 for f in usedclassifFinal:
-   if classNumberInit[f]>maxl and f !='back_ground':
+   if classNumberInit[f]>maxl and f not in hugeClass:
+#      print 'fmax', f
       maxl=classNumberInit[f]
 print ('max number of patches in : ',maxl)
 print '----------'
+#define coeff min
+minl=1000000
+for f in usedclassifFinal:
+   if classNumberInit[f]<minl:
+      minl=classNumberInit[f]
+print ('min number of patches in : ',minl)
+print '----------'
 #artificially clamp back-ground to maxl
-classNumberInit['back_ground']=maxl
+#if maxuse :
+#    classNumberInit['back_ground']=maxl
+#    classNumberInit['healthy']=maxl
+#elif not useWeight:
+#    for f in usedclassifFinal:
+#      classNumberInit[f]=minl
+print ' maximum number of patches ratio'  
 classConso={}
 for f in usedclassifFinal:
-  classConso[f]=float(maxl)/classNumberInit[f]
-for f in usedclassifFinal:
-    print (f,' {0:.2f}'.format (classConso[f]))
+    classConso[f]=float(maxl)/max(1,classNumberInit[f])
+#for f in usedclassifFinal:
+    print (f,classif[f],' {0:.2f}'.format (classConso[f]))
 print '----------'
-
+print ' upsampling if ratio <' ,upSampling
+print 'usedclassifFinal', usedclassifFinal
+for f in usedclassifFinal:
+#    print f, classConso[f], upSampling,maxl, float(maxl)/upSampling/classNumberInit[f]
+    if int(classConso[f]) >upSampling:
+#         print f
+         classAugm[f]=float(maxl)/upSampling/classNumberInit[f]
+    print (f,classif[f],' {0:.2f}'.format (classAugm[f]))
+print '----------'
+#ooo
 
 def   createStruct(f):
     print('Create patches directories from class : ',f)
@@ -266,58 +303,77 @@ def   createStruct(f):
     os.mkdir(patch_dir_Te_f) 
     
 def  copypatch(f):
-    cnif=maxl
+    if useWeight or maxuse:
+        cnif=maxl
+    else:
+        cnif =minl
+    print 'cnif', cnif
     print('copy all in new training  directory for:',f)
     category_dir = os.path.join(patch_dir, f)
     patch_dir_Tr_f=os.path.join(patch_dir_Tr,f)
-#            print  ('the path into the categories is: ', lc)
+    patch_dir_tempo=[]
     sub_categories_dir_list = (os.listdir(category_dir))
-    print ('the sub categories are : ', sub_categories_dir_list)
+#    print ('the sub categories are : ', sub_categories_dir_list)
     for subCategory in sub_categories_dir_list:
         subCategory_dir = os.path.join(category_dir, subCategory)
-                #print  'the path into the sub categories is: '
-                #print subCategory_dir
-        if f !='back_ground':
-            #copy all the files if not back-ground
-            image_files = (os.listdir(subCategory_dir))
-    
-            for filei in image_files:
-    
-                if filei.find('.bmp') > 0:
-                            fileSource=os.path.join(subCategory_dir, filei)
-                            fileDest=os.path.join(patch_dir_Tr_f, filei)
-                        # load the .bmp file into dest directory
-                            shutil.copyfile(fileSource,fileDest)
-        else:
-             #copy only randomly maxl file for back-ground
-            while cnif > 0:
-                dircache.reset()
-                filename = random.choice(dircache.listdir(subCategory_dir))
-                fileSource=os.path.join(subCategory_dir, filename)
-                fileDest=os.path.join(patch_dir_Tr_f, filename)
-                shutil.copyfile(fileSource,fileDest)
-                cnif-=1           
+        print  'the path into the sub categories is: ',subCategory_dir
+        image_files = [name for name in os.listdir(subCategory_dir) if name.find('.bmp')>0]
+        for filei in image_files:
+#             if filei.find('.bmp') > 0:
+                 fileSource=os.path.join(subCategory_dir, filei)
+                 patch_dir_tempo.append(fileSource)
+    print len(patch_dir_tempo)
+    cnif = min (cnif,len(patch_dir_tempo))
+    print 'new cnif',cnif
+#    if maxuse:
+    if maxuse or useWeight:
+#        if f !='back_ground' and f !='healthy':
+        if f not in hugeClass:
 
-def  selectpatch(f,n,t):
+                    #copy all the files if not back-ground               
+                    for filei in patch_dir_tempo:
+                        (top,tail)=os.path.split(filei)
+                        fileDest=os.path.join(patch_dir_Tr_f, tail)
+                                # load the .bmp file into dest directory
+                        shutil.copyfile(filei,fileDest)
+        else:
+                     #copy only randomly maxl file for back-ground
+#                    print 'aa'
+                    filenamesort = random.sample(patch_dir_tempo,cnif)
+                    for i in range (0,len(filenamesort)):
+                        (top,tail)=os.path.split(filenamesort[i])
+                        fileDest=os.path.join(patch_dir_Tr_f, tail)
+                        shutil.copyfile(filenamesort[i],fileDest)
+    else:
+                    filenamesort = random.sample(patch_dir_tempo,cnif)
+                    for i in range (0,len(filenamesort)):
+                        (top,tail)=os.path.split(filenamesort[i])
+                        fileDest=os.path.join(patch_dir_Tr_f, tail)
+                        shutil.copyfile(filenamesort[i],fileDest)
+
+
+def  selectpatch(f,n,t,l):
     print(n,' patch selection for:',f, 'for:',t )
     patch_dir_Tr_f=os.path.join(patch_dir_Tr,f)
-    cni=classNumberInit[f]
-    cnif=cni*n
+    listdirf=os.listdir(patch_dir_Tr_f)
+#    cni=classNumberInit[f]
+#    cni=len(l)
+    cnif=int(l*n)
+    print cnif
     if t=='T':
         dirdest=os.path.join(patch_dir_Te,f)
     else:
         dirdest=os.path.join(patch_dir_V,f)
-    while cnif > 0:
-        dircache.reset()
-        filename = random.choice(dircache.listdir(patch_dir_Tr_f))
-        fileSource=os.path.join(patch_dir_Tr_f, filename)
-        fileDest=os.path.join(dirdest, filename)
-        # load the .bmp file into dest directory
-#        print fileSource
-#        print fileDest
-        shutil.move(fileSource,fileDest)
-        cnif-=1
+
+    filenamesort = random.sample(listdirf,cnif)
+    for i in range (0,len(filenamesort)):
+                    (top,tail)=os.path.split(filenamesort[i])
+                    fileSource=os.path.join(patch_dir_Tr_f,filenamesort[i])
+                    fileDest=os.path.join(dirdest, tail)
+                    shutil.move(fileSource,fileDest)    
         
+    
+#        
   
 
 def listcl(f,p,m):
@@ -340,51 +396,128 @@ def listcl(f,p,m):
         category_dir=patch_dir_Te_f
         maxp=m*0.25
     print('list patches from class : ',f, act)                 
-    
-#    while classNumberNew[lc]<m:        
-#    category_dir_f = os.path.join(category_dir, f)
-#            print  ('the path into the categories is: ', lc)
-                #print subCategory_dir
-    image_files = os.listdir(category_dir)
 
-    while classNumberN<maxp: 
+    image_files = [name for name in os.listdir(category_dir) if  name.find('.bmp') > 0]
+    maxp1=1
+    if useWeight and f not in hugeClass:
+         if p=='Tr':
+            maxp1=int(classNumberInit[f]*classAugm[f]*0.5*augf)
+         else:
+            maxp1=int(classNumberInit[f]*classAugm[f]*0.25)
+            
+    elif maxuse:
+        maxp1=maxp
+#    print m, maxp1 ,maxp,classNumberInit[f],classAugm[f]  
+    while classNumberN<maxp1: 
         loop+=1
-        print('loop;',loop,'for :',f,'classnumber:',classNumberN,'max:',maxp)
-       
+#        print('loops;',loop,'for :',f,'classnumber:',classNumberN,'max:',maxp1)
+        
         for filei in image_files:
-    
-                        if filei.find('.bmp') > 0:
-                            image = misc.imread(os.path.join(category_dir,filei), flatten= 0)
+
+                            image=cv2.imread(os.path.join(category_dir,filei),-1)
                         # load the .bmp file into array
-                            if p=='Tr':                        
-                                classNumberN=classNumberN+augf                         
-                                #print image                  
-                                # 1 append the array to the dataset list                        
+                            if p=='Tr':   
+#                                print('loopi;',loop,'for :',f,'classnumber:',classNumberN,'max:',maxp1)
+                                classNumberN=classNumberN+augf
+#                              
+                                # 1 append the array to the dataset list    
+#                                img=image.astype('float64')
+#                                img -=np.mean(img)
+#                                img /= np.std(img)
                                 dlist.append(image)
+                                
         #                        #2 created rotated copies of images
-                                image90 = np.rot90(image)                        
+                                image90 = np.rot90(image)  
+#                                img=image90.astype('float64')
+#                                img -=np.mean(img)
+#                                img /= np.std(img)
                                 dlist.append(image90)
+                                
         #                        #3 created rotated copies of images                        
                                 image180 = np.rot90(image90)
+#                                img=image180.astype('float64')
+#                                img -=np.mean(img)
+#                                img /= np.std(img)
                                 dlist.append(image180)
+                          
         #                        #4 created rotated copies of images                                          
                                 image270 = np.rot90(image180)                      
-                                dlist.append(image270)   
+#                                img=image270.astype('float64')
+#                                img -=np.mean(img)
+#                                img /= np.std(img)
+                                dlist.append(image270) 
                                 
                                 #5 flip fimage left-right
                                 imagefliplr=np.fliplr(image)                  
-                                dlist.append(imagefliplr)
+#                                img=imagefliplr.astype('float64')
+#                                img -=np.mean(img)
+#                                img /= np.std(img)
+                                dlist.append(imagefliplr) 
                                 
-                                #6 flip fimage up-down
+                                #6 flip fimage left-right +rot 90
+                                image90 = np.rot90(imagefliplr)  
+#                                img=image90.astype('float64')
+#                                img -=np.mean(img)
+#                                img /= np.std(img)
+                                dlist.append(image90)
+                                
+        #                        #7 flip fimage left-right +rot 180                   
+                                image180 = np.rot90(image90)
+#                                img=image180.astype('float64')
+#                                img -=np.mean(img)
+#                                img /= np.std(img)
+                                dlist.append(image180)
+                          
+        #                        #8 flip fimage left-right +rot 270                                          
+                                image270 = np.rot90(image180)                      
+#                                img=image270.astype('float64')
+#                                img -=np.mean(img)
+#                                img /= np.std(img)
+                                dlist.append(image270)                                                                 
+                                                            
+                                #9 flip fimage up-down
                                 imageflipud=np.flipud(image)                                   
-                                dlist.append(imageflipud)
+#                                img=imageflipud.astype('float64')
+#                                img -=np.mean(img)
+#                                img /= np.std(img)
+                                dlist.append(imageflipud) 
+                                
+                                 #10 flip fimage up-down +rot90                               
+                                image90 = np.rot90(imageflipud)  
+#                                img=image90.astype('float64')
+#                                img -=np.mean(img)
+#                                img /= np.std(img)
+                                dlist.append(image90)
+                                
+        #                         #11 flip fimage up-down +rot180                          
+                                image180 = np.rot90(image90)
+#                                img=image180.astype('float64')
+#                                img -=np.mean(img)
+#                                img /= np.std(img)
+                                dlist.append(image180)
+                          
+        #                        #12 flip fimage up-down +rot270                                           
+                                image270 = np.rot90(image180)                      
+#                                img=image270.astype('float64')
+#                                img -=np.mean(img)
+#                                img /= np.std(img)
+                                dlist.append(image270) 
+                                
+                                
                             else:
                                 classNumberN=classNumberN+1
                                 #print image                  
                                 # 1 append the array to the dataset list                        
-                                dlist.append(image)
-
-                            
+#                                img=image.astype('float64')
+#                                img -=np.mean(img)
+#                                img /= np.std(img)
+#                                dlist.append(image) 
+                                dlist.append(image) 
+                
+#    dlist=np.array(dlist)    
+##    print dlist[0]    
+#    print len(dlist)  
+#    print dlist.shape
     return dlist,classNumberN
 
 
@@ -397,6 +530,8 @@ dataset_listTr =[]
 dataset_listV =[]
 dataset_listTe =[]
 for f in usedclassifFinal:
+#for f in ('healthy',):
+
      print('work on :',f)
      dataset_listTri =[]
      dataset_listVi =[]
@@ -405,10 +540,17 @@ for f in usedclassifFinal:
      createStruct(f)
      #copy patches in new directory flat
      copypatch(f)
+#     ooo
+     
+     patch_dir_Tr_f=os.path.join(patch_dir_Tr,f)
+     listdirf=os.listdir(patch_dir_Tr_f)
+     l=len(listdirf)
      # select 1/4 patches for test
-     selectpatch(f,0.25,'T')
+     selectpatch(f,0.25,'T',l)
+
 #     select 1/4 patches for validation
-     selectpatch(f,0.25,'V')
+     selectpatch(f,0.25,'V',l)
+#     bbbb
      
     #fill list with patches
 
@@ -416,12 +558,14 @@ for f in usedclassifFinal:
      dataset_listVi ,classNumberNewV[f]= listcl(f,'V',maxl)
      dataset_listTei,classNumberNewTe[f] = listcl(f,'Te',maxl)
 #     resul=equal(maxl,dlf,f)
-
+#     print dataset_listTri.shape
      i=0
      while i <  classNumberNewTr[f] :
         dataset_listTr.append(dataset_listTri[i])
+
         label_listTr.append(classif[f])
         i+=1
+
      i=0
      while i <  classNumberNewV[f] :         
         dataset_listV.append(dataset_listVi[i])
@@ -469,7 +613,7 @@ y_test = np.array(label_listTe)
 #
 #X_train, X_intermediate, y_train, y_intermediate = train_test_split(X, y, test_size=0.5, random_state=42)
 #X_val, X_test, y_val, y_test = train_test_split(X_intermediate, y_intermediate, test_size=0.5, random_state=42)
-print '-----------INIT----------------'
+print '-----------FINAL----------------'
 print ('Xtrain :',X_train.shape)
 print ('Xval : ',X_val.shape)
 print ('Xtest : ',X_test.shape)
@@ -477,54 +621,25 @@ print ('ytrain : ',y_train.shape)
 print ('yval : ',y_val.shape)
 print ('ytest : ',y_test.shape)
     
-#print ('22 as example:',X_train[22])
-# save the dataset and label set into serial formatted pkl 
-#
-#pickle.dump(X_train, open( os.path.join(pickle_dir,"X_train.pkl"), "wb" ))
-#pickle.dump(X_test, open( os.path.join(pickle_dir,"X_test.pkl"), "wb" ))
-#pickle.dump(X_val, open(os.path.join(pickle_dir,"X_val.pkl"), "wb" ))
-#pickle.dump(y_train, open( os.path.join(pickle_dir,"y_train.pkl"), "wb" ))
-#pickle.dump(y_test, open( os.path.join(pickle_dir,"y_test.pkl"), "wb" ))
-#pickle.dump(y_val, open( os.path.join(pickle_dir,"y_val.pkl"), "wb" ))
 
+#    
+for f in usedclassifFinal:
+#    print f,classNumberNewTr[f]
+    class_weights[classif[f]]=round(float(classNumberNewTr['back_ground'])/classNumberNewTr[f],3)
+print '---------------'
+class_weights[classif['back_ground']]=0.1
+print 'weights'
+print class_weights
 
-#load to merge pickle
-#recuperated_X_train = pickle.load( open( os.path.join(pickle_dirToMerge,"X_train.pkl"), "rb" ) )
-recuperated_X_train = pickle.load( open( os.path.join(pickle_dirToMerge,"X_train.pkl"), "rb" ) ).tolist()
-recuperated_X_test = pickle.load( open( os.path.join(pickle_dirToMerge,"X_test.pkl"), "rb" ) ).tolist()
-recuperated_X_val = pickle.load( open( os.path.join(pickle_dirToMerge,"X_val.pkl"), "rb" ) ).tolist()
-recuperated_y_train = pickle.load( open( os.path.join(pickle_dirToMerge,"y_train.pkl"), "rb" ) ).tolist()
-recuperated_y_test = pickle.load( open( os.path.join(pickle_dirToMerge,"y_test.pkl"), "rb" ) ).tolist()
-recuperated_y_val = pickle.load( open( os.path.join(pickle_dirToMerge,"y_val.pkl"), "rb" ) ).tolist()
-#print ('recuparated 22 as example:',recuperated_X_train[22])
-print '-----------to merge----------------'
-print ('XtrainRecup :',len (recuperated_X_train))
-print ('XvalRecup : ',len(recuperated_X_val))
-print ('XtestRecup : ',len(recuperated_X_test))
-print ('ytrainRecup : ',len(recuperated_y_train))
-print ('yvalRecup : ',len(recuperated_y_val))
-print ('ytestRecup : ',len(recuperated_y_test))
-
-
-X_train = np.array(dataset_listTr+recuperated_X_train)
-X_val = np.array(dataset_listV+recuperated_X_val)
-y_train = np.array(label_listTr+recuperated_y_train)
-y_val = np.array(label_listV+recuperated_y_val)
-X_test = np.array(dataset_listTe+recuperated_X_test)
-y_test = np.array(label_listTe+recuperated_y_test)
-
-
-print '-----------after merge----------------'
-print ('Xtrain :',X_train.shape)
-print ('Xval : ',X_val.shape)
-print ('Xtest : ',X_test.shape)
-print ('ytrain : ',y_train.shape)
-print ('yval : ',y_val.shape)
-print ('ytest : ',y_test.shape)
-    
+pickle.dump(class_weights, open( os.path.join(pickle_dir,"class_weights.pkl"), "wb" ))
 pickle.dump(X_train, open( os.path.join(pickle_dir,"X_train.pkl"), "wb" ))
 pickle.dump(X_test, open( os.path.join(pickle_dir,"X_test.pkl"), "wb" ))
 pickle.dump(X_val, open(os.path.join(pickle_dir,"X_val.pkl"), "wb" ))
 pickle.dump(y_train, open( os.path.join(pickle_dir,"y_train.pkl"), "wb" ))
 pickle.dump(y_test, open( os.path.join(pickle_dir,"y_test.pkl"), "wb" ))
 pickle.dump(y_val, open( os.path.join(pickle_dir,"y_val.pkl"), "wb" ))
+pickle.dump(y_val, open( os.path.join(pickle_dir,"y_val.pkl"), "wb" ))
+
+recuperated_class_weights = pickle.load( open(os.path.join(pickle_dir,"class_weights.pkl"), "rb" ) )
+print 'recuparated weights'
+print recuperated_class_weights
