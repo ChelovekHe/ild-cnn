@@ -9,6 +9,7 @@ import dicom
 import PIL
 from PIL import Image, ImageFont, ImageDraw
 import cv2
+import matplotlib.pyplot as plt    
 #import matplotlib.pyplot as plt    
 #general parameters and file, directory names
 #######################################################
@@ -17,7 +18,7 @@ import cv2
 namedirHUG = 'HUG'
 #subdir for roi in text
 subHUG='SEG'
-
+att =10 #coef for color attenuation
 ########################################################################
 ######################  end ############################################
 ########################################################################
@@ -31,6 +32,8 @@ lungmask='lung_mask'
 lungmaskbmp='bmp'
 #directory name with scan with roi for segmentation
 sroiseg='sroiseg'
+
+segDir='segDir' #directory with roi overlay
 
 #full path names
 cwd=os.getcwd()
@@ -72,10 +75,12 @@ darkgreen=(11,123,96)
 pink =(255,128,255)
 lightgreen=(125,237,125)
 orange=(255,153,102)
+lowgreen=(0,51,51)
 
 usedclassif = [
         'consolidation',
         'fibrosis',
+        'HC',
         'ground_glass',
         'healthy',
         'micronodules',
@@ -87,6 +92,7 @@ usedclassif = [
 classif ={
         'consolidation':0,
         'fibrosis':1,
+        'HC':1,
         'ground_glass':2,
         'healthy':3,
         'micronodules':4,
@@ -104,11 +110,38 @@ classif ={
          'peripheral_micronodules':15,
          'tuberculosis':16
         }
- 
+
+classifc ={
+'back_ground':darkgreen,
+#'consolidation':red,
+'consolidation':cyan,
+'HC':blue,
+'fibrosis':blue,
+'ground_glass':red,
+#'ground_glass':yellow,
+'healthy':darkgreen,
+#'micronodules':cyan,
+'micronodules':green,
+#'reticulation':purple,
+'reticulation':yellow,
+'air_trapping':pink,
+'cysts':lightgreen,
+ 'bronchiectasis':orange,
+ 'nolung': lowgreen,
+ 'bronchial_wall_thickening':white,
+ 'early_fibrosis':white,
+ 'emphysema':white,
+ 'increased_attenuation':white,
+ 'macronodules':white,
+ 'pcp':white,
+ 'peripheral_micronodules':white,
+ 'tuberculosis':white
+ }
+
 classifcseg ={
-'back_ground':10,
 'consolidation':20,
 'fibrosis':30,
+'HC':30,
 'ground_glass':40,
 'healthy':50,
 'micronodules':60,
@@ -154,6 +187,7 @@ def genebmp(dirName):
     global  dimtabx,dimtaby
     #directory for patches
     bmp_dir = os.path.join(dirName, bmpname)
+    seg_dirp = os.path.join(dirName, segDir)
 
     fileList = [name for name in os.listdir(dirName) if ".dcm" in name.lower()]
 
@@ -170,7 +204,9 @@ def genebmp(dirName):
             endnumslice=filename.find('.dcm')
             imgcore=filename[0:endnumslice]+'_'+str(slicenumber)+'.'+typei
             bmpfile=os.path.join(bmp_dir,imgcore)
+            segfile=os.path.join(seg_dirp,imgcore)
             scipy.misc.imsave(bmpfile,dsr)
+            scipy.misc.imsave(segfile,dsr)
             dimtabx=dsr.shape[0]
             dimtaby=dimtabx
             textw='n: '+f+' scan: '+str(slicenumber)
@@ -216,8 +252,9 @@ def reptfulle(tabc,dx,dy):
 
 def tagviewb(fig,label,x,y):
     """write text in image according to label and color"""
+
     imgn=Image.open(fig)
-    draw = ImageDraw.Draw(imgn)
+    img=np.array(imgn)
     col=white
     extseg=str(classifcseg[label])
     labnow=classif[label]
@@ -228,19 +265,47 @@ def tagviewb(fig,label,x,y):
         deltay=60
     else:        
         deltay=25*((labnow-1)%5)
-    draw.text((x, y+deltay),label+' '+extseg,col,font=font10)
-    imgn.save(fig)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    viseg=cv2.putText(img,label+' '+extseg,(x, y+deltay), font, 0.3,col,1)
+    cv2.imwrite(fig, viseg)
+
+
+def tagviewct(tab,label,x,y):
+    """write text in image according to label and color"""
+
+    col=classifc[label]
+    labnow=classif[label]
+#    print (labnow, text)
+    if label == 'back_ground':
+        x=0
+        y=0        
+        deltay=60
+    else:        
+        deltay=25*((labnow-1)%5)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    viseg=cv2.putText(tab,label,(x, y+deltay), font, 0.3,col,1)
+#    viseg = cv2.cvtColor(viseg,cv2.COLOR_RGB2BGR)
+    return viseg
+
 
 def tagviews(fig,text,x,y):
     """write simple text in image """
     imgn=Image.open(fig)
-    draw = ImageDraw.Draw(imgn)
-    draw.text((x, y),text,white,font=font10)
-    imgn.save(fig)
+    col=white
+    img=np.array(imgn)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    viseg=cv2.putText(img,text,(x, y), font, 0.3,col,1)
+    cv2.imwrite(fig, viseg)
+
+def tagviewst(tab,text,x,y):
+    """write simple text in image """
+    col=white
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    viseg=cv2.putText(tab,text,(x, y), font, 0.3,col,1)
+    return viseg
 
 
 def contour2(im,l):  
-
     viseg=np.zeros((dimtabx,dimtaby,3), np.uint8)
     imgray = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
     ret,thresh = cv2.threshold(imgray,0,255,0)
@@ -248,21 +313,21 @@ def contour2(im,l):
         cv2.CHAIN_APPROX_SIMPLE)
     contours = [cv2.approxPolyDP(cnt, 0, True) for cnt in contours0]
     colseg=classifcseg[l]
-
     cv2.drawContours(viseg,contours,-1,(colseg,colseg,colseg),-1,cv2.LINE_AA)
 #    cv2.fillPoly(viseg,pts=[contours],col)
     return viseg
    
 ###
     
-def pavs (imgi,tab,dx,dy,namedirtopcf, iln,f,label,loca,typei):
+def pavs (imgi,namedirtopcf, iln,label):
     """ generate patches from ROI"""
 #    print 'pavement'
     
     viseg=contour2(imgi,label)
    
-    patchpathc=os.path.join(namedirtopcf,bmpname)
+    patchpathc=os.path.join(namedirtopcf,sroiseg)
     contenujpg = os.listdir(patchpathc)
+#    print patchpathc
 
     debnumslice=iln.find('_')+1
     endnumslice=iln.find('_',debnumslice)
@@ -279,8 +344,58 @@ def pavs (imgi,tab,dx,dy,namedirtopcf, iln,f,label,loca,typei):
             cv2.imwrite(namescanseg,imnseg)
             tagviewb (namescanseg,label,0,100)
             break
-            
+    return 
 
+
+    
+def geneOverlay (namedirtopcf):
+    """ generate overlay from ROI"""
+#    print 'pavement'
+    (top,tail)=os.path.split(namedirtopcf)
+    scanpath=os.path.join(namedirtopcf,bmpname)
+    sroipath=os.path.join(namedirtopcf,sroiseg)
+    overpath=os.path.join(namedirtopcf,segDir)    
+    contenusroi = os.listdir(sroipath)
+    contenuscan = os.listdir(scanpath)
+#    print contenusroi
+
+    for  n in contenusroi:           
+#        print n, typei
+        sliceNumberN=rsliceNum(n,'_','.'+typei)
+        for s in contenuscan:
+            sliceNumberS=rsliceNum(s,'_','.'+typei)
+            if sliceNumberN==sliceNumberS:
+                namesroi=os.path.join(sroipath,n)
+                nameover=os.path.join(overpath,n)
+                namescan=os.path.join(scanpath,n)
+                imscan = Image.open(namescan)
+                imsroi= Image.open(namesroi)
+                tabscan = np.array(imscan)
+                tabscanc = cv2.cvtColor(tabscan,cv2.COLOR_GRAY2BGR)
+                tabsroi=  np.array(imsroi)
+
+                tabover=np.zeros((dimtabx,dimtaby,3), np.uint8)
+                for p in  classifcseg:
+                    greylevel=classifcseg[p]
+                    g3=(greylevel,greylevel,greylevel)
+                    masky=cv2.inRange(tabsroi,g3,g3)
+                    colMask=classifc[p]
+                    colMaskt=(int(colMask[0]/att),int(colMask[1]/att),int(colMask[2]/att))
+
+                    if masky.max()>0:
+                        new_im = Image.new('RGB', (dimtabx,dimtaby),colMaskt)
+                        tabnim=np.array(new_im)
+                        outy=cv2.bitwise_and(tabnim,tabnim,mask=masky)
+                        tabover=cv2.add(outy,tabover)
+                        textw='n: '+tail+' scan: '+str(sliceNumberS)
+                        tabover= tagviewst(tabover,textw,0,20) 
+                        tabover=tagviewct(tabover,p,0,50) 
+
+                imtowrite=cv2.add(tabscanc,tabover)
+                imtowrite = cv2.cvtColor(imtowrite,cv2.COLOR_RGB2BGR)
+                cv2.imwrite(nameover,imtowrite)
+                        
+                break
     return 
 
 
@@ -397,6 +512,10 @@ for f in listdirc:
     remove_folder(sroidirseg)
     os.mkdir(sroidirseg)
 
+    segDirp=os.path.join(namedirtopcf,segDir)
+    remove_folder(segDirp)
+    os.mkdir(segDirp)
+
     remove_folder(os.path.join(namedirtopcf,patchfile))
     os.mkdir(os.path.join(namedirtopcf,patchfile))
     contenudir = [name for name in os.listdir(namedirtopcf) if name.find('.txt')>0]
@@ -456,15 +575,11 @@ for f in listdirc:
                 locaposend=t.find('\n',locapos)
                 locaposdeb = t.find(' ',locapos)
                 loca=t[locaposdeb:locaposend].strip()
-#                print(label,loca)
-            #print(tabcff,coefi)
-                tabccfi=tabcff
-#                    tabccfi=tabcff/coefi
 
-#                print(tabccfi)
+                tabccfi=tabcff/coefi
+
                 tabc=tabccfi.astype(int)
-                
-#                print(tabc)
+
                 print('generate tables from:',l,'in:', f)
                 tabz,imgi= reptfulle(tabc,dimtabx,dimtaby)                
                 imgc=imgc+imgi                    
@@ -477,6 +592,7 @@ for f in listdirc:
         if label in usedclassif:
             print('c :',c, label,loca)
             print('creates patches from:',iln, 'in:', f)
-            pavs (imgc,tabzc,dimtabx,dimtaby,namedirtopcf,iln,f,label,loca,typei)
+            pavs (imgc,namedirtopcf, iln,label)            
+    geneOverlay (namedirtopcf)
 
 print('completed')
