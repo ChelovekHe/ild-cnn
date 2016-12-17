@@ -21,17 +21,19 @@ import random
 HUG='HUG'   
 subDir='TOPPATCH'
 #extent='essai'
-extent='16_set0_gci'
-#extent='16_set0g'
-
+extent='16_set0_gci_16b'
+extent='essai'
+wbg = True # use back-ground or not
 hugeClass=['healthy','back_ground']
 #hugeClass=['back_ground']
 upSampling=10 # define thershold for up sampling in term of ration compared to max class
 subDirc=subDir+'_'+extent
-pickel_dirsource='pickle_ds37'
+pickel_dirsource='pickle_ds431'
 name_dir_patch='patches_norm'
 #output pickle dir with dataset   
 augf=12
+typei='bmp' #can be jpg
+typei='png' #can be jpg
 
 #define the pattern set
 pset=0
@@ -100,87 +102,163 @@ os.mkdir(pickle_dir)
 
 
 #define a list of used labels
-if pset ==0:
-    usedclassif = [
-        'back_ground',
-        'consolidation',
-        'HC',
-        'ground_glass',
-        'healthy',
-        'micronodules',
-        'reticulation',
-        'air_trapping',
-        'cysts',
-        'bronchiectasis'
-        ]
-        
-    classif ={
+if wbg:
+    print 'with BG'
+    if pset ==0:
+        usedclassif = [
+            'back_ground',
+            'consolidation',
+            'HC',
+            'ground_glass',
+            'healthy',
+            'micronodules',
+            'reticulation',
+            'air_trapping',
+            'cysts',
+            'bronchiectasis'
+            ]
+            
+        classif ={
+            'back_ground':0,
+            'consolidation':1,
+            'HC':2,
+            'ground_glass':3,
+            'healthy':4,
+            'micronodules':5,
+            'reticulation':6,
+            'air_trapping':7,
+            'cysts':8,
+            'bronchiectasis':9,
+            
+             'bronchial_wall_thickening':10,
+             'early_fibrosis':11,
+             'emphysema':12,
+             'increased_attenuation':13,
+             'macronodules':14,
+             'pcp':15,
+             'peripheral_micronodules':16,
+             'tuberculosis':17
+            }
+    elif pset==1:
+        usedclassif = [
+            'back_ground',
+            'consolidation',
+            'ground_glass',
+            'healthy'
+        #    ,'cysts'
+            ]
+            
+        classif ={
         'back_ground':0,
         'consolidation':1,
-        'HC':2,
-        'ground_glass':3,
-        'healthy':4,
-        'micronodules':5,
-        'reticulation':6,
-        'air_trapping':7,
-        'cysts':8,
-        'bronchiectasis':9,
-        
-         'bronchial_wall_thickening':10,
-         'early_fibrosis':11,
-         'emphysema':12,
-         'increased_attenuation':13,
-         'macronodules':14,
-         'pcp':15,
-         'peripheral_micronodules':16,
-         'tuberculosis':17
+        'ground_glass':2,
+        'healthy':3
+        #,'cysts':4
         }
-elif pset==1:
-    usedclassif = [
-        'back_ground',
-        'consolidation',
-        'ground_glass',
-        'healthy'
-    #    ,'cysts'
-        ]
-        
-    classif ={
-    'back_ground':0,
-    'consolidation':1,
-    'ground_glass':2,
-    'healthy':3
-    #,'cysts':4
-    }
-elif pset==2:
-        usedclassif = [
-        'back_ground',
-        'fibrosis',
-        'healthy',
-        'micronodules'
-        ,'reticulation'
-        ]
-        
-        classif ={
-    'back_ground':0,
-    'fibrosis':1,
-    'healthy':2,
-    'micronodules':3,
-    'reticulation':4,
-    }
-elif pset==3:
-    usedclassif = [
-        'back_ground',
-        'healthy',
-        'air_trapping',
-        ]
-    classif ={
+    elif pset==2:
+            usedclassif = [
+            'back_ground',
+            'fibrosis',
+            'healthy',
+            'micronodules'
+            ,'reticulation'
+            ]
+            
+            classif ={
         'back_ground':0,
-        'healthy':1,
-        'air_trapping':2,
+        'fibrosis':1,
+        'healthy':2,
+        'micronodules':3,
+        'reticulation':4,
         }
+    elif pset==3:
+        usedclassif = [
+            'back_ground',
+            'healthy',
+            'air_trapping',
+            ]
+        classif ={
+            'back_ground':0,
+            'healthy':1,
+            'air_trapping':2,
+            }
+    else:
+            print 'eRROR :', pset, 'not allowed'
 else:
-        print 'eRROR :', pset, 'not allowed'
-
+    print 'no BG'
+    if pset ==0:
+        usedclassif = [
+            'consolidation',
+            'HC',
+            'ground_glass',
+            'healthy',
+            'micronodules',
+            'reticulation',
+            'air_trapping',
+            'cysts',
+            'bronchiectasis'
+            ]
+            
+        classif ={
+            'consolidation':0,
+            'HC':1,
+            'ground_glass':2,
+            'healthy':3,
+            'micronodules':4,
+            'reticulation':5,
+            'air_trapping':6,
+            'cysts':7,
+            'bronchiectasis':8,
+            
+             'bronchial_wall_thickening':9,
+             'early_fibrosis':10,
+             'emphysema':11,
+             'increased_attenuation':12,
+             'macronodules':13,
+             'pcp':14,
+             'peripheral_micronodules':15,
+             'tuberculosis':16
+            }
+    elif pset==1:
+        usedclassif = [
+            'consolidation',
+            'ground_glass',
+            'healthy'
+        #    ,'cysts'
+            ]
+            
+        classif ={
+        'consolidation':0,
+        'ground_glass':1,
+        'healthy':2
+        #,'cysts':4
+        }
+    elif pset==2:
+            usedclassif = [
+            'fibrosis',
+            'healthy',
+            'micronodules'
+            ,'reticulation'
+            ]
+            
+            classif ={
+        'fibrosis':0,
+        'healthy':1,
+        'micronodules':2,
+        'reticulation':3,
+        }
+    elif pset==3:
+        usedclassif = [
+            'healthy',
+            'air_trapping',
+            ]
+        classif ={
+            'healthy':0,
+            'air_trapping':1,
+            }
+    else:
+            print 'eRROR :', pset, 'not allowed'
+    
 class_weights={}
 
 #define a dictionary with labels
@@ -231,7 +309,7 @@ for category in usedclassifFinal:
         subCategory_dir = os.path.join(category_dir, subCategory)
         print  'the path into the sub categories is: ',subCategory_dir
         #print subCategory_dir
-        image_files = [name for name in os.listdir(subCategory_dir) if name.find('.bmp') > 0 ]
+        image_files = [name for name in os.listdir(subCategory_dir) if name.find('.'+typei) > 0 ]
         
        
         for filei in image_files:
@@ -285,7 +363,7 @@ for f in usedclassifFinal:
          classAugm[f]=float(maxl)/upSampling/classNumberInit[f]
     print (f,classif[f],' {0:.2f}'.format (classAugm[f]))
 print '----------'
-#ooo
+
 
 def   createStruct(f):
     print('Create patches directories from class : ',f)
@@ -317,7 +395,7 @@ def  copypatch(f):
     for subCategory in sub_categories_dir_list:
         subCategory_dir = os.path.join(category_dir, subCategory)
         print  'the path into the sub categories is: ',subCategory_dir
-        image_files = [name for name in os.listdir(subCategory_dir) if name.find('.bmp')>0]
+        image_files = [name for name in os.listdir(subCategory_dir) if name.find('.'+typei)>0]
         for filei in image_files:
 #             if filei.find('.bmp') > 0:
                  fileSource=os.path.join(subCategory_dir, filei)
@@ -397,7 +475,7 @@ def listcl(f,p,m):
         maxp=m*0.25
     print('list patches from class : ',f, act)                 
 
-    image_files = [name for name in os.listdir(category_dir) if  name.find('.bmp') > 0]
+    image_files = [name for name in os.listdir(category_dir) if  name.find('.'+typei) > 0]
     maxp1=1
     if useWeight and f not in hugeClass:
          if p=='Tr':
@@ -415,7 +493,8 @@ def listcl(f,p,m):
         for filei in image_files:
 
                             image=cv2.imread(os.path.join(category_dir,filei),-1)
-                        # load the .bmp file into array
+
+        # load the .bmp file into array
                             if p=='Tr':   
 #                                print('loopi;',loop,'for :',f,'classnumber:',classNumberN,'max:',maxp1)
                                 classNumberN=classNumberN+augf
@@ -428,6 +507,7 @@ def listcl(f,p,m):
                                 
         #                        #2 created rotated copies of images
                                 image90 = np.rot90(image)  
+
 #                                img=image90.astype('float64')
 #                                img -=np.mean(img)
 #                                img /= np.std(img)
@@ -448,7 +528,8 @@ def listcl(f,p,m):
                                 dlist.append(image270) 
                                 
                                 #5 flip fimage left-right
-                                imagefliplr=np.fliplr(image)                  
+                                imagefliplr=np.fliplr(image)   
+
 #                                img=imagefliplr.astype('float64')
 #                                img -=np.mean(img)
 #                                img /= np.std(img)
@@ -621,13 +702,19 @@ print ('ytrain : ',y_train.shape)
 print ('yval : ',y_val.shape)
 print ('ytest : ',y_test.shape)
     
-
+#min_val=np.min(X_train)
+#max_val=np.max(X_train)
+#print 'Xtrain', min_val, max_val
 #    
 for f in usedclassifFinal:
 #    print f,classNumberNewTr[f]
-    class_weights[classif[f]]=round(float(classNumberNewTr['back_ground'])/classNumberNewTr[f],3)
+    if wbg:
+        class_weights[classif[f]]=round(float(classNumberNewTr['back_ground'])/classNumberNewTr[f],3)
+    else:
+        class_weights[classif[f]]=round(float(classNumberNewTr['healthy'])/classNumberNewTr[f],3)
 print '---------------'
-class_weights[classif['back_ground']]=0.1
+if wbg: 
+        class_weights[classif['back_ground']]=0.1
 print 'weights'
 print class_weights
 
@@ -639,6 +726,11 @@ pickle.dump(y_train, open( os.path.join(pickle_dir,"y_train.pkl"), "wb" ))
 pickle.dump(y_test, open( os.path.join(pickle_dir,"y_test.pkl"), "wb" ))
 pickle.dump(y_val, open( os.path.join(pickle_dir,"y_val.pkl"), "wb" ))
 pickle.dump(y_val, open( os.path.join(pickle_dir,"y_val.pkl"), "wb" ))
+
+recuperated_X_train = pickle.load( open( os.path.join(pickle_dir,"X_train.pkl"), "rb" ) )
+#min_val=np.min(recuperated_X_train)
+#max_val=np.max(recuperated_X_train)
+#print 'recuperated_X_train', min_val, max_val
 
 recuperated_class_weights = pickle.load( open(os.path.join(pickle_dir,"class_weights.pkl"), "rb" ) )
 print 'recuparated weights'
