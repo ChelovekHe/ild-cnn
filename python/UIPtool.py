@@ -702,7 +702,7 @@ def genebmp(dirName,fn,subs):
                     dsrLung=dsrLung*c
                     dsrLung=dsrLung.astype('uint8')  
                     fxslung=float(RefDslung.PixelSpacing[0])/avgPixelSpacing
-                    listlungdict=cv2.resize(dsr,None,fx=fxslung,fy=fxslung,interpolation=cv2.INTER_LINEAR)
+                    listlungdict=cv2.resize(dsrLung,None,fx=fxslung,fy=fxslung,interpolation=cv2.INTER_LINEAR)
 #                    listlungdict= scipy.misc.imresize(dsrLung,fxslung,interp='bicubic',mode=None) 
 #                    print imgresize.shape,listlungdict.shape
                     lungcoref=os.path.join(lung_bmp_dir,imgcorescan)
@@ -1224,10 +1224,10 @@ def ILDCNNpredict(patient_dir_s,setn,patch_list):
         xfpr=os.path.join(picklefileout_f_dir,Xrefpkl)
         pickle.dump(patch_list, open( xfpr, "wb" ))
         print 'number of patches', len(patch_list), 'in :',setn
-        for i in range (0,len(patch_list)):
-            prec, mprobai = maxproba(proba[i])
-            classlabel=fidclass(prec,classif['set0']) 
-            print classlabel,mprobai
+#        for i in range (0,len(patch_list)):
+#            prec, mprobai = maxproba(proba[i])
+#            classlabel=fidclass(prec,classif['set0']) 
+#            print classlabel,mprobai
 #        ooo
 #        print proba[0]
 
@@ -1532,7 +1532,7 @@ def  visua(dirpatientdb,cla,wra,nset,dx):
 #        print 'img:',img, 'imgc:',imgc        
         
         tablscan=cv2.imread(imgc,1)
-#        print os.path.exists(imgc)
+#        print imgc
 #        print tablscan
 #        print imgc
 
@@ -1614,11 +1614,11 @@ def  visua(dirpatientdb,cla,wra,nset,dx):
 #            tablscang=tablscan
             ret, mask = cv2.threshold(img2gray, 10, 255, cv2.THRESH_BINARY)
             mask_inv = cv2.bitwise_not(mask)
-#            mask_inv=cv2.cvtColor(mask_inv,cv2.COLOR_GRAY2BGR)
-#            mask_inv=cv2.cvtColor(mask_inv,cv2.COLOR_GRAY2BGR)
+            tablscan=cv2.cvtColor(tablscan,cv2.COLOR_BGR2GRAY)
+#            mask_inv=cv2.cvtColor(mask_inv,cv2.COLOR_BGR2GRAY)
 #            print mask_inv.shape,tablscan.shape
             img1_bg = cv2.bitwise_and(tablscan,tablscan,mask = mask_inv)  
-#            imcolor=cv2.cvtColor(img1_bg,cv2.COLOR_GRAY2BGR)
+            img1_bg=cv2.cvtColor(img1_bg,cv2.COLOR_GRAY2BGR)
 #superimpose scan and contours      
 #            print img1_bg.shape, vis.shape
             imn=cv2.add(img1_bg,vis)
