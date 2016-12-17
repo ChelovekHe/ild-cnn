@@ -60,27 +60,39 @@ dimpavys={}
 #ex34: 32 Global Contrast cv2, no local contrast 
 #ex35: 32  Global Contrast cv2,  no local contrast , cmean defined by treaning
 #ex371 32 global cont cv2, local contr int, no cmean, full depth
-#ex37 32 global cont cv2, local contr int, no cmean, full depth
-#ex40 16 global cont cv2, local contr int, no cmean, full depth
-#pset==2:  'HC', 'micronodules'
+#ex37 32 global cont cv2, local contr int, no cmean, full depth Geneva only back_ground
+#ex38 32 global cont cv2, local contr int, no cmean, full depth geneva + Gre
+#ex40 16 global cont cv2, local contr int, no cmean, full depth, with back-ground
+#ex41 16 global cont cv2, local contr int, no cmean, full depth, no back-ground
+#ex42 16 global cont cv2, local contr int, no cmean, full depth, no back-ground, only GNB HC
+#ex43 16 global cont cv2, No local contr int, no cmean, full depth, no back-ground, only GNB HC
+#ex44 16 global cont cv2, local contr int, no cmean, full depth,  back-ground, only GNB HC
+#ex45 16 global cont cv2, no local contr int, no cmean, full depth, back-ground, only GNB HC, 8 bits
+#ex46 16 global cont int, No local contr int, no cmean, full depth,  back-ground, only GNB HC, 16 bits
+#ex47 16 global cont int, local contr int, no cmean, full depth,  back-ground, limited subset HC, 16 bits
 
 
-contrast = True # to enhance contrast on patch put True                       #  internal by default
+
 globalHist=True  #use histogram equalization on full image
-globalHistInternal=False  #use histogram equalization on full image with internal or opencv
+globalHistInternal=True  #use histogram equalization on full image with internal (True) or opencv
+
+contrast = True # to enhance contrast on patch put True       
 normiInternal=True #normalization internal procedure or openCV
+
 thrpatch = 1              # threshold for patch acceptance in area ratio
 cMean=False # if data are centered on mean on the full set
-#PcMean=True # if data are centered on mean patch per patch
 trainingMean=0.371#for HUG 32 pixels
-usetrainingMean=True # if training mean or actual mean is used
+usetrainingMean=True # if cMean then  training mean or actual mean is used
 useFullImageDepth=True #to use 255 or 128 (from ex35)
-
-gp='pickle_ex40'
+#imageDepth=255 #number of bits used on dicom images (2 **n)
+imageDepth=65535 #number of bits used on dicom images (2 **n) 13 bits
+wbg = True                # with or without bg (true if with back_ground)
+gp='pickle_ex47'
 dx=16
 
 threeFileTxt='uip.txt'
 threeFile='uip.html'
+threeFilejs='world.js'
 threeFileTop='uiptop.html'
 threeFileBot='uipbot.html'
 
@@ -104,13 +116,13 @@ lungdimpavx =15
 lungdimpavy = 15
 
 #parameters for tools
-wbg = True                # with or without bg (true if with back_ground)
+
 
 thrprobaUIP=0.5 #probability to take into account patches for UI
-thrproba=0.5 # #probability to take into account patches for visu
+thrproba=0.7 # #probability to take into account patches for visu
 avgPixelSpacing=0.734   # average pixel spacing
 subErosion= 15 #erosion factor for subpleura in mm
-imageDepth=255 #number of bits used on dicom images (2 **n)
+
 
 #Specific for Grenoble images
 rotScan180=False
@@ -150,6 +162,7 @@ jpegpath = 'patch_jpeg'
 
 #directory with bmp from dicom
 scanbmp='scan_bmp'
+scanbmpbmp='scan_bmpbmp'
 
 Xprepkl='X_predict.pkl'
 Xrefpkl='X_file_reference.pkl'
@@ -164,15 +177,32 @@ subsamplef='subsample.pkl'
 modelname= 'ILD_CNN_model.h5'
 
 # list label not to visualize
+excluvisu=['back_ground','healthy'
+            ,'micronodules',
+            'consolidation',
+            'HC',
+            'ground_glass',
+            'healthy',
+            'micronodules',
+            'reticulation',
+            'air_trapping',            
+             'bronchial_wall_thickening',
+             'early_fibrosis',
+             'emphysema',
+             'increased_attenuation',
+             'macronodules',
+             'pcp',
+             'peripheral_micronodules',
+             'tuberculosis'     
+                 ]
 excluvisu=['back_ground','healthy']
-#excluvisu=[]
 
 #dataset supposed to be healthy
 datahealthy=['138']
 
 #image  patch format
 typei='bmp' 
-
+typeid='png' #can be jpg for 16 bits
 
 
 #########################################################################
@@ -194,14 +224,15 @@ def setva():
             path_patient=varglobal[2]
 #            print path_patient
             thrproba=varglobal[1]
+            print 'thrproba setva', thrproba
             thrpatch=varglobal[0]
+            
             subsdef=varglobal[3]
 
 
 
 def newva():
  pickle.dump(varglobal, open( glovalf, "wb" ))
-
 
 (cwdtop,tail)=os.path.split(cwd)
 
@@ -307,12 +338,8 @@ volcol={
  'tuberculosis':'boxMaterialWhite'}            
              
  
- 
- 
- 
 #only label we consider, number will start at 0 anyway
  
-
  
 classifSet0bg={
             'back_ground':0,
@@ -544,6 +571,7 @@ def genebmp(dirName,fn,subs):
     print ('load dicom files in :',dirName, 'scan name:',fn)
     #directory for patches
     bmp_dir = os.path.join(dirName, scanbmp)
+    bmp_bmp_dir = os.path.join(dirName, scanbmpbmp)
 
     FilesDCM =(os.path.join(dirName,fn))  
 #           
@@ -563,29 +591,50 @@ def genebmp(dirName,fn,subs):
     print 'slice pitch in z :',slicepitch
   
     dsr= RefDs.pixel_array
+#    min_val=np.min(dsr)
+#    max_val=np.max(dsr)
+#    print 'dsr orig',min_val, max_val
             #scale the dicom pixel range to be in 0-255
     dsr= dsr-dsr.min()
-    c=255.0/dsr.max()
-    dsr=dsr*c
-    dsr=dsr.astype('uint8')
+#    c=float(imageDepth)/dsr.max()
+#    dsr=dsr*c
+    if imageDepth <256:
+        dsr=dsr.astype('uint8')
+    else:
+        dsr=dsr.astype('uint16')
+#    min_val=np.min(dsr)
+#    max_val=np.max(dsr)
+#    print 'dsr',min_val, max_val
+
     #resize the dicom to have always the same pixel/mm
     fxs=float(RefDs.PixelSpacing[0])/avgPixelSpacing  
     
     slicenumber=int(RefDs.InstanceNumber)
     endnumslice=fn.find('.dcm')
-    imgcore=fn[0:endnumslice]+'_'+str(slicenumber)+'.'+typei
-#    slicenumber=rsliceNum(fn,'-','.dcm')
- 
-    
-
+    if imageDepth <256:
+        imgcore=fn[0:endnumslice]+'_'+str(slicenumber)+'.'+typei
+    else:
+        imgcore=fn[0:endnumslice]+'_'+str(slicenumber)+'.'+typeid   
+    imgcorebmp=fn[0:endnumslice]+'_'+str(slicenumber)+'.'+typei  
     bmpfile=os.path.join(bmp_dir,imgcore)
-
-    imgresize1= scipy.misc.imresize(dsr,fxs,interp='bicubic',mode=None)
+    bmp_bmp_file=os.path.join(bmp_bmp_dir,imgcorebmp)
+    imgresize1=cv2.resize(dsr,None,fx=fxs,fy=fxs,interpolation=cv2.INTER_LINEAR)
+#    imgresize1= scipy.misc.imresize(dsr,fxs,interp='bicubic',mode=None)
     if globalHist:
                 if globalHistInternal:
                     imgresize = normi(imgresize1) 
+#                    min_val=np.min(imgresize1)
+#                    max_val=np.max(imgresize1)
+#                    print 'imgresize1',min_val, max_val
+#                    min_val=np.min(imgresize)
+#                    max_val=np.max(imgresize)
+#                    print 'imgresize',min_val, max_val
+#                    ooo
                 else:
-                    imgresize = cv2.equalizeHist(imgresize1) 
+                    if imageDepth <256:
+                        imgresize = cv2.equalizeHist(imgresize1) 
+                    else:
+                        imgresize= cv2.normalize(imgresize1, 0, imageDepth,cv2.NORM_MINMAX);
     else:
                 imgresize=imgresize1    
     
@@ -597,7 +646,17 @@ def genebmp(dirName,fn,subs):
     if rotScan180:
         imgresize=rotateImage(imgresize, 180)
         
-    scipy.misc.imsave(bmpfile,imgresize)
+   
+    if imageDepth <256:
+        scipy.misc.imsave(bmpfile,imgresize)
+        scipy.misc.imsave(bmp_bmp_file,imgresize)
+    else:
+        cv2.imwrite (bmpfile, imgresize,[int(cv2.IMWRITE_PNG_COMPRESSION),0]) 
+        scipy.misc.imsave(bmp_bmp_file,imgresize)
+#    min_val=np.min(imgresize)
+#    max_val=np.max(imgresize)
+#    print 'imgresize',min_val, max_val
+#    ooo
     dimtabx=imgresize.shape[0]
     dimtaby=imgresize.shape[1]
 #    print dimtabx
@@ -642,8 +701,9 @@ def genebmp(dirName,fn,subs):
                     c=255.0/dsrLung.max()
                     dsrLung=dsrLung*c
                     dsrLung=dsrLung.astype('uint8')  
-                    fxslung=float(RefDslung.PixelSpacing[0])/avgPixelSpacing 
-                    listlungdict= scipy.misc.imresize(dsrLung,fxslung,interp='bicubic',mode=None) 
+                    fxslung=float(RefDslung.PixelSpacing[0])/avgPixelSpacing
+                    listlungdict=cv2.resize(dsr,None,fx=fxslung,fy=fxslung,interpolation=cv2.INTER_LINEAR)
+#                    listlungdict= scipy.misc.imresize(dsrLung,fxslung,interp='bicubic',mode=None) 
 #                    print imgresize.shape,listlungdict.shape
                     lungcoref=os.path.join(lung_bmp_dir,imgcorescan)
                     scipy.misc.imsave(lungcoref,listlungdict)
@@ -662,10 +722,10 @@ def genebmp(dirName,fn,subs):
 
 def normi(tabi):
      """ normalise patches 0 255"""
-
      tabi1=tabi-tabi.min()
-
-     tabi2=tabi1*(imageDepth/float(tabi1.max()-tabi1.min()))
+     max_val=np.max(tabi1)
+#     print 'tabi1',min_val, max_val,imageDepth/float(max_val)
+     tabi2=tabi1*(imageDepth/float(max_val))
      if imageDepth<256:
          tabi2=tabi2.astype('uint8')
      else:
@@ -902,6 +962,7 @@ def pavgene (namedirtopcf,nset):
         namemask=os.path.join(namemask1,lungmaskbmp)
 #        print namemask
         bmpdir = os.path.join(namedirtopcf,scanbmp)
+        bmp_bmp_dir = os.path.join(namedirtopcf,scanbmpbmp)
         jpegpathf=os.path.join(namedirtopcf,jpegpath)
         
         listbmp= os.listdir(bmpdir)
@@ -917,8 +978,13 @@ def pavgene (namedirtopcf,nset):
 #             tflung=False
 #             tab2w = np.zeros((dimtabx,dimtaby), np.uint8)
              tabfw = np.zeros((dimtabx,dimtaby,3), np.uint8)
-
-             slicenumber= rsliceNum(img,'_','.bmp')
+             if imageDepth<256:
+                slicenumber= rsliceNum(img,'_','.'+typei)
+             else:
+                slicenumber= rsliceNum(img,'_','.'+typeid)
+             endname=img.find('.'+typeid)
+             imgbmp=img[0:endname]+'.'+typei
+             
 
              if listlungbmp!=[]:
 #                    print(listlungbmp)
@@ -942,9 +1008,13 @@ def pavgene (namedirtopcf,nset):
 
              bmpfile = os.path.join(bmpdir,img)
 #             tabf = cv2.imread(bmpfile,1)
-             im = ImagePIL.open(bmpfile).convert('L')
+             im = ImagePIL.open(bmpfile)
              tabf=np.array(im)
-
+             
+             bmp_bmpfile = os.path.join(bmp_bmp_dir,imgbmp)
+#             tabf = cv2.imread(bmpfile,1)
+             imbmp = ImagePIL.open(bmp_bmpfile).convert('L')
+             tabfbmp=np.array(imbmp)
 #             cv2.imshow('image',tablung) 
 #             cv2.waitKey(0)
              nz= np.count_nonzero(tablung)
@@ -964,6 +1034,7 @@ def pavgene (namedirtopcf,nset):
                 
              i=xmin
 #             print xmin,xmax,ymin,ymax
+#             ooo
              while i <= xmax:
                  j=ymin
         #        j=maxj
@@ -974,12 +1045,17 @@ def pavgene (namedirtopcf,nset):
                      area= tabpatch.sum()  
 #                     np.putmask(t,t>0,255)
 #                    check if area above threshold
+
                      targ=float(area)/pxy
 #                     if i>400 and j >250 and i <410 and j<280 and targ>0.8:
 #                         print i,j,targ,area
                      if targ>thrpatch:
 
                         imgray = tabf[j:j+dimpavy,i:i+dimpavx]
+                        if imageDepth<256:
+                            imgray=imgray.astype('uint8')  
+                        else:                                        
+                            imgray=imgray.astype('uint16')
                         
 #                        if i ==136 and j==254:
 #                            print i,j,targ,area
@@ -996,10 +1072,15 @@ def pavgene (namedirtopcf,nset):
                         if imagemax > 0 and min_val != max_val:
 #                            namepatch=patchpathf+'/p_'+str(slicenumber)+'_'+str(i)+'_'+str(j)+'.'+typei
                             if contrast:
-                                    if normiInternal:                                        
+                                    if normiInternal:                                         
                                         tabi2=normi(imgray)
                                     else:
-                                        tabi2 = cv2.equalizeHist(imgray)                                                                            
+                                        if imageDepth<256:
+                                            tabi2 = cv2.equalizeHist(imgray)     
+                                        else:
+#                                           tabi2=normi(imgray)
+                                           tabi2= cv2.normalize(imgray, 0, imageDepth,cv2.NORM_MINMAX);
+                    
 #                                    print tabi2
 #                                    if PcMean:
 #                                            tabi2=tabi2.astype('float64')
@@ -1010,6 +1091,10 @@ def pavgene (namedirtopcf,nset):
 #                                            min_val, max_val, min_loc,max_loc = cv2.minMaxLoc(tabi2)
 #                                            print '3', min_val,max_val,min_loc,max_loc
                                     patch_list.append((dptail,slicenumber,i,j,tabi2))
+#                                    min_val=np.min(tabi2)
+#                                    max_val=np.max(tabi2)
+#                                    print 'patch norm', min_val, max_val
+                                  
 #                                    n+=1
                             else:
 #                                imgray -=np.mean(imgray)
@@ -1019,7 +1104,10 @@ def pavgene (namedirtopcf,nset):
 #                                    imgray /= np.std(imgray)
                                   
                                 patch_list.append((dptail,slicenumber,i,j,imgray))
-                            
+#                                min_val=np.min(imgray)
+#                                max_val=np.max(imgray)
+#                                print 'patch no norm', min_val, max_val
+#                            ooo
                             tablung[j:j+dimpavy,i:i+dimpavx]=0
                             x=0
                             while x < dimpavx:
@@ -1040,13 +1128,14 @@ def pavgene (namedirtopcf,nset):
 #                 i+=dimpavx
                  i+=1
 #        print namedirtopcf,n
-             tabfrgb=cv2.cvtColor(tabf,cv2.COLOR_GRAY2BGR)
+             tabfrgb=cv2.cvtColor(tabfbmp,cv2.COLOR_GRAY2BGR)
              scipy.misc.imsave(jpegpathf+'/'+'s_'+str(slicenumber)+'.bmp', cv2.add(tabfw,tabfrgb))
         return patch_list
 # 
 def fidclass(numero,classn):
     """return class from number"""
     found=False
+#    print numero
     for cle, valeur in classn.items():
         
         if valeur == numero:
@@ -1073,8 +1162,8 @@ def ILDCNNpredict(patient_dir_s,setn,patch_list):
         X0=len(dataset_list) 
         if useFullImageDepth:
             X_predict1 =np.expand_dims(dataset_list,1)/float(imageDepth)
-        else:
-            
+#            print 'full'
+        else:            
 #            X_predict1 =np.expand_dims(dataset_list,1)
 #        else:            
             X_predict1 =np.expand_dims(dataset_list,1)/float(imageDepth)/2  
@@ -1135,17 +1224,18 @@ def ILDCNNpredict(patient_dir_s,setn,patch_list):
         xfpr=os.path.join(picklefileout_f_dir,Xrefpkl)
         pickle.dump(patch_list, open( xfpr, "wb" ))
         print 'number of patches', len(patch_list), 'in :',setn
-#        for i in range (0,len(patch_list)):
-#            prec, mprobai = maxproba(proba[i])
-#            classlabel=fidclass(prec,classif) 
-#            print classlabel,mprobai
+        for i in range (0,len(patch_list)):
+            prec, mprobai = maxproba(proba[i])
+            classlabel=fidclass(prec,classif['set0']) 
+            print classlabel,mprobai
+#        ooo
 #        print proba[0]
 
 
 
 
     
-def tagviews(b,fig,t0,x0,y0,t1,x1,y1,t2,x2,y2,t3,x3,y3,t4,x4,y4):
+def tagviews(b,fig,t0,x0,y0,t1,x1,y1,t2,x2,y2,t3,x3,y3,t4,x4,y4,t5,x5,y5):
     """write simple text in image """
     imgn=ImagePIL.open(fig)
     draw = ImageDraw.Draw(imgn)
@@ -1158,6 +1248,7 @@ def tagviews(b,fig,t0,x0,y0,t1,x1,y1,t2,x2,y2,t3,x3,y3,t4,x4,y4):
     if not b:
         draw.text((x3, y3),t3,white,font=font10)
     draw.text((x4, y4),t4,white,font=font10)
+    draw.text((x5, y5),t5,white,font=font10)
     imgn.save(fig)
 
 def maxproba(proba):
@@ -1297,7 +1388,14 @@ def genethreef(dirpatientdb,nset,lsn,cla):
         shutil.copyfile(souuip,desouip)
         threeFileTxtl=topdir+'_'+threeFileTxt
         volumefileT = open(os.path.join(dirpatientdb,threeFileTxtl), 'w')
+        jsfile=topdir+'_'+threeFilejs
+        jsfilel=os.path.join(dirpatientdb,jsfile)
         volumefile = open(os.path.join(dirpatientdb,threeFilel), 'a')
+        volumefilejs = open(jsfilel, 'w')
+#        jsfilel.replace("\\","/")
+#        print jsfilel
+        volumefile.write( '<script src="'+jsfilel+'"></script>\n)')	
+        volumefilejs.write( 'function buildobj()	{\n')	
         pz=slicepitch/avgPixelSpacing
 #        zxd=slicepitch*lsn/2/avgPixelSpacing
         zxd=round(pz*lsn/2,3)
@@ -1306,14 +1404,14 @@ def genethreef(dirpatientdb,nset,lsn,cla):
         volumefileT.write( 'var boxGeometry = new THREE.BoxGeometry( '+str(dimpavxs[nset])+' , '+\
         str(dimpavxs[nset])+' , '+str(round(pz,3))+') ;\n\n')
         volumefileT.write('var voxels = [\n')
-        volumefile.write( 'var boxGeometry = new THREE.BoxGeometry( '+str(dimpavxs[nset])+' , '+\
+        volumefilejs.write( 'var boxGeometry = new THREE.BoxGeometry( '+str(dimpavxs[nset])+' , '+\
         str(dimpavxs[nset])+' , '+str(round(pz,3))+') ;\n')
 #        zxd=slicepitch*lsn/2/avgPixelSpacing
         print 'pz',pz
 #        volumefile.write('camera.position.set('+str(dimtabx/2)+',-'+str(dimtabx/2)+','+str(zxd)+' );\n') 
 #        volumefile.write('controls.target.set('+str(dimtabx/2)+','+str(dimtabx/2)+','+str(zxd)+') ;\n') 
-        volumefile.write('camera.position.set(0 '+', -'+str(dimtabx)+', 0 );\n') 
-        volumefile.write('controls.target.set(0 , 0 , 0 );\n') 
+        volumefilejs.write('camera.position.set(0 '+', -'+str(dimtabx)+', 0 );\n') 
+        volumefilejs.write('controls.target.set(0 , 0 , 0 );\n') 
         
 #    print  >> volumefile ,dictSurf
 #    volumefile.close()
@@ -1347,12 +1445,16 @@ def genethreef(dirpatientdb,nset,lsn,cla):
             else:                     
                  volumefileT.write(',\n{"x": '+str(xpat)+', "y": '+str(ypat)+', "z": '+str(zpa)\
                  +', "class": "'+classlabel+'", "proba": '+str(mproba)+' }')
-                 
-            volumefile.write( 'var newMaterial= '+bm+'.clone();\n'); 
-            volumefile.write( 'newMaterial.opacity= '+str(mproba)+';\n'); 
-            volumefile.write( bmn+' = new THREE.Mesh(boxGeometry,newMaterial)\n'); 
-            volumefile.write( bmn+'.position.set('+str(xpat)+', '+str(ypat)+','+str(zpa)+');\n')
-            volumefile.write('scene.add('+bmn+');\n') 
+
+            volumefilejs.write( 'var newMaterial= '+bm+'.clone();\n'); 
+            if mproba> thrprobaUIP:
+                mproba=(mproba-thrprobaUIP)/thrprobaUIP
+                volumefilejs.write( 'newMaterial.opacity= '+str(mproba)+';\n'); 
+            else:
+                volumefilejs.write( 'newMaterial.opacity= 0;\n'); 
+            volumefilejs.write( bmn+' = new THREE.Mesh(boxGeometry,newMaterial)\n'); 
+            volumefilejs.write( bmn+'.position.set('+str(xpat)+', '+str(ypat)+','+str(zpa)+');\n')
+            volumefilejs.write('scene.add('+bmn+');\n') 
 #            else:
 #                bm=volcol['healthy']            
 #                bmn = 'boxMesh'+str(ill)
@@ -1365,9 +1467,11 @@ def genethreef(dirpatientdb,nset,lsn,cla):
         vtb=open(os.path.join(cwd,threeFileBot),'r')
         app=vtb.read()
         volumefile.write(app)
+        volumefilejs.write('\n}\n')
         volumefile.close()
         volumefileT.close()
         vtb.close()
+        volumefilejs.close()
 
 
 
@@ -1391,33 +1495,42 @@ def  visua(dirpatientdb,cla,wra,nset,dx):
     predictout_dir_th = os.path.join(predictout_dir,str(thrproba))
     (preprob,listnamepatch)=loadpkl(dirpatientdb,nset)
 #    print preprob[0], listnamepatch
-    dirpatientfdb=os.path.join(dirpatientdb,scanbmp)
+    dirpatientfdb=os.path.join(dirpatientdb,scanbmpbmp)
     dirpatientfsdb=os.path.join(dirpatientdb,sroi)
     listbmpscan=os.listdir(dirpatientfdb)
 #    print dirpatientfdb
     listlabelf={}
+    sroiE=False
+    if os.path.exists(dirpatientfsdb):
+        sroiE=True
+        listbmpsroi=os.listdir(dirpatientfsdb)
     for img in listbmpscan:
+#        if imageDepth<256:
+        slicenumber= rsliceNum(img,'_','.'+typei)
+#        else:
+#                slicenumber= rsliceNum(img,'_','.'+typeid)
+#        slicenumber=rsliceNum(img,'_','.'+typei)
         imgt = np.zeros((dimtabx,dimtaby,3), np.uint8)
         listlabelaverage={}
         listlabel={}
         listlabelrec={}
 #        print dirpatientfsdb,dirpatientfdb
-        if os.path.exists(dirpatientfsdb):
+        if sroiE:
+            for imgsroi in listbmpsroi:
+#                print imgsroi
+                slicenumbersroi=rsliceNum(imgsroi,'_','.'+typei)
+                if slicenumbersroi==slicenumber:
+                    imgc=os.path.join(dirpatientfsdb,imgsroi)
+                    break
+            
 #            print 'sroi'
-            imgc=os.path.join(dirpatientfsdb,img)
+            
         else:
 #            print 'scan'
             imgc=os.path.join(dirpatientfdb,img)
  
 #        print 'img:',img, 'imgc:',imgc        
-        endnumslice=img.find('.'+typei)
-        imgcore=img[0:endnumslice]
-#        print imgcore
-        posend=endnumslice
-        while img.find('_',posend)==-1:
-            posend-=1
-        debnumslice=posend+1
-        slicenumber=int((img[debnumslice:endnumslice])) 
+        
         tablscan=cv2.imread(imgc,1)
 #        print os.path.exists(imgc)
 #        print tablscan
@@ -1483,9 +1596,10 @@ def  visua(dirpatientdb,cla,wra,nset,dx):
             ill+=1
 
         if wra:        
-            imgcorefull=imgcore+'.bmp'
-            imgnameth=os.path.join(predictout_dir_th,imgcorefull)
-            imgnamebv=os.path.join(predictout_dir_bv,imgcorefull)
+#            imgcorefull=imgcore+'.bmp'
+#            imgcorefull=img
+            imgnameth=os.path.join(predictout_dir_th,img)
+            imgnamebv=os.path.join(predictout_dir_bv,img)
     #        print 'imgname',imgname    
             cv2.imwrite(imgnamebv,tablscan)
             
@@ -1532,8 +1646,9 @@ def  visua(dirpatientdb,cla,wra,nset,dx):
             t2='CONFIDENTIAL - prototype - not for medical use'
             t3='For threshold: '+str(thrproba)+' :'
             t4=time.asctime()
-            tagviews(True,imgnamebv,t0,0,0,t1,0,20,t2,20,dimtaby-27,t3,0,38,t4,0,dimtaby-10)
-            tagviews(False,imgnameth,t0,0,0,t1,0,20,t2,20,dimtaby-27,t3,0,38,t4,0,dimtaby-10)
+            t5= picklefile['set0']
+            tagviews(True,imgnamebv,t0,0,0,t1,0,20,t2,20,dimtaby-27,t3,0,38,t4,0,dimtaby-10,t5,0,dimtaby-20)
+            tagviews(False,imgnameth,t0,0,0,t1,0,20,t2,20,dimtaby-27,t3,0,38,t4,0,dimtaby-10,t5,0,dimtaby-20)
 
         
             errorfile.write('\n'+'number of labels in :'+str(topdir)+' '+str(dptail)+str (img)+'\n' )
@@ -1759,6 +1874,7 @@ def openfichier(k,dirk,top,L,nset):
     subsample=varglobal[3]
     pdirk = os.path.join(dirk,k)
     img = cv2.imread(pdirk,1)
+
     dimtabx= img.shape[0]
     dimtaby= dimtabx
     imgtext = np.zeros((dimtabx,dimtaby,3), np.uint8)
@@ -1830,7 +1946,7 @@ def openfichier(k,dirk,top,L,nset):
 def listfichier(dossier):
     Lf=[]
     L= os.listdir(dossier)
-#    print L
+#    print L, dossier
     for k in L:
         if ".bmp" in k.lower(): 
             Lf.append(k)
@@ -2094,7 +2210,10 @@ def  calcSupNp (ntp, pat,nset,tabmed):
              vis = np.zeros((dimtabx,dimtaby,3), np.uint8)
              ill+=1
              for lbg in listbg:
-                 slicenamebg=rsliceNum(lbg,'_','.bmp')
+
+                 slicenamebg=rsliceNum(lbg,'_','.'+typei)
+              
+#                 slicenamebg=rsliceNum(lbg,'_','.bmp')
 #                 endnumslicebg=lbg.find('.bmp')
 #                 posendbg=endnumslicebg
 #                 while lbg.find('_',posendbg)==-1:
@@ -2495,6 +2614,9 @@ def runpredict(pp,subs,thrp, thpro,retou):
                 bmp_dir = os.path.join(namedirtopcf, scanbmp)
                 remove_folder(bmp_dir)    
                 os.mkdir(bmp_dir) 
+                bmp_bmp_dir = os.path.join(namedirtopcf, scanbmpbmp)
+                remove_folder(bmp_bmp_dir)    
+                os.mkdir(bmp_bmp_dir) 
                 #directory for lung mask
                 lung_dir = os.path.join(namedirtopcf, lungmask)
                 lung_bmp_dir = os.path.join(lung_dir, lungmaskbmp)
@@ -2516,8 +2638,8 @@ def runpredict(pp,subs,thrp, thpro,retou):
                 os.mkdir(pickledir_lung)
                 #directory for bpredicted images
                 predictout_f_dir = os.path.join( namedirtopcf,predictout)
-                remove_folder(predictout_f_dir)
-                os.mkdir(predictout_f_dir)
+                if not os.path.exists(predictout_f_dir):
+                    os.mkdir(predictout_f_dir)
                 
                 predictout_f_dir_bg = os.path.join( predictout_f_dir,vbg)
                 remove_folder(predictout_f_dir_bg)
