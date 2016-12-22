@@ -9,8 +9,8 @@ import dicom
 import PIL
 from PIL import Image, ImageFont, ImageDraw
 import cv2
-import matplotlib.pyplot as plt    
 #import matplotlib.pyplot as plt    
+  
 #general parameters and file, directory names
 #######################################################
 #customisation part for datataprep
@@ -184,7 +184,7 @@ def rsliceNum(s,c,e):
 def genebmp(dirName):
     """generate patches from dicom files and sroi"""
     print ('generate  bmp files from dicom files in :',f)
-    global  dimtabx,dimtaby
+    global  dimtabx,dimtaby,fx
     #directory for patches
     bmp_dir = os.path.join(dirName, bmpname)
     seg_dirp = os.path.join(dirName, segDir)
@@ -195,11 +195,18 @@ def genebmp(dirName):
 #        print(filename)
             FilesDCM =(os.path.join(dirName,filename))            
             ds = dicom.read_file(FilesDCM)
+           
             dsr= ds.pixel_array          
             dsr= dsr-dsr.min()
             c=255.0/dsr.max()
             dsr=dsr*c
             dsr=dsr.astype('uint8')
+            if int(ds.Rows) != 512:
+                fx= 512.0/int(ds.Rows)
+#                print fx
+                dsr=cv2.resize(dsr,(512,512),interpolation=cv2.INTER_LINEAR)
+            else:
+                fx=1
             slicenumber=int(ds.InstanceNumber)                                 
             endnumslice=filename.find('.dcm')
             imgcore=filename[0:endnumslice]+'_'+str(slicenumber)+'.'+typei
@@ -240,7 +247,6 @@ def genebmp(dirName):
                  np.putmask(dsrlung,dsrlung>0,100)
                  scipy.misc.imsave(lungcoref,dsrlung)
 
-
 def reptfulle(tabc,dx,dy):
     imgi = np.zeros((dx,dy,3), np.uint8)
     cv2.polylines(imgi,[tabc],True,(1,1,1)) 
@@ -264,7 +270,7 @@ def tagviewb(fig,label,x,y):
         y=0        
         deltay=60
     else:        
-        deltay=25*((labnow-1)%5)
+        deltay=25*(labnow-1)
     font = cv2.FONT_HERSHEY_SIMPLEX
     viseg=cv2.putText(img,label+' '+extseg,(x, y+deltay), font, 0.3,col,1)
     cv2.imwrite(fig, viseg)
@@ -281,7 +287,7 @@ def tagviewct(tab,label,x,y):
         y=0        
         deltay=60
     else:        
-        deltay=25*((labnow-1)%5)
+        deltay=25*(labnow-1)
     font = cv2.FONT_HERSHEY_SIMPLEX
     viseg=cv2.putText(tab,label,(x, y+deltay), font, 0.3,col,1)
 #    viseg = cv2.cvtColor(viseg,cv2.COLOR_RGB2BGR)
@@ -308,22 +314,37 @@ def tagviewst(tab,text,x,y):
 def contour2(im,l):  
     viseg=np.zeros((dimtabx,dimtaby,3), np.uint8)
     imgray = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
+    
     ret,thresh = cv2.threshold(imgray,0,255,0)
     im2,contours0, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,\
         cv2.CHAIN_APPROX_SIMPLE)
     contours = [cv2.approxPolyDP(cnt, 0, True) for cnt in contours0]
     colseg=classifcseg[l]
-    cv2.drawContours(viseg,contours,-1,(colseg,colseg,colseg),-1,cv2.LINE_AA)
-#    cv2.fillPoly(viseg,pts=[contours],col)
+    cv2.drawContours(viseg,contours,-1,(colseg,colseg,colseg),-1,cv2.LINE_4)
     return viseg
    
 ###
-    
+def contour3(im,l):  
+    col=classifc[l]
+#    print l
+#    print 'dimtabx' , dimtabx
+    vis = np.zeros((dimtabx,dimtaby,3), np.uint8)
+#    print im.shape
+#    imgray = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
+    ret,thresh = cv2.threshold(im,0,255,0)
+    im2,contours0, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,\
+        cv2.CHAIN_APPROX_SIMPLE)
+    contours = [cv2.approxPolyDP(cnt, 0, True) for cnt in contours0]
+    cv2.drawContours(vis,contours,-1,col,1,cv2.LINE_AA)
+    return vis
+      
+   
 def pavs (imgi,namedirtopcf, iln,label):
-    """ generate patches from ROI"""
-#    print 'pavement'
-    
+    """ generate roi segment """    
     viseg=contour2(imgi,label)
+    ret,thresh = cv2.threshold(viseg,0,255,0)
+    imgray = cv2.cvtColor(thresh,cv2.COLOR_BGR2GRAY)
+    masky=cv2.bitwise_not(imgray)
    
     patchpathc=os.path.join(namedirtopcf,sroiseg)
     contenujpg = os.listdir(patchpathc)
@@ -340,7 +361,8 @@ def pavs (imgi,namedirtopcf, iln,label):
             namescanseg=os.path.join(sroidirseg,n)
             orignseg = Image.open(namescanseg)
             tablscanseg = np.array(orignseg)
-            imnseg=cv2.add(viseg,tablscanseg)
+            imnseg = cv2.bitwise_and(tablscanseg,tablscanseg,mask = masky)
+            imnseg=cv2.add(viseg,imnseg)
             cv2.imwrite(namescanseg,imnseg)
             tagviewb (namescanseg,label,0,100)
             break
@@ -379,18 +401,29 @@ def geneOverlay (namedirtopcf):
                     greylevel=classifcseg[p]
                     g3=(greylevel,greylevel,greylevel)
                     masky=cv2.inRange(tabsroi,g3,g3)
-                    colMask=classifc[p]
-                    colMaskt=(int(colMask[0]/att),int(colMask[1]/att),int(colMask[2]/att))
+                    
+                    vis=contour3(masky,p)
+#                    colMask=classifc[p]
+#                    colMaskt=(int(colMask[0]/att),int(colMask[1]/att),int(colMask[2]/att))
 
                     if masky.max()>0:
-                        new_im = Image.new('RGB', (dimtabx,dimtaby),colMaskt)
-                        tabnim=np.array(new_im)
-                        outy=cv2.bitwise_and(tabnim,tabnim,mask=masky)
-                        tabover=cv2.add(outy,tabover)
-                        textw='n: '+tail+' scan: '+str(sliceNumberS)
-                        tabover= tagviewst(tabover,textw,0,20) 
-                        tabover=tagviewct(tabover,p,0,50) 
+                        
+#                        new_im = Image.new('RGB', (dimtabx,dimtaby),colMaskt)
+#                        tabnim=np.array(new_im)
+#                        outy=cv2.bitwise_and(tabnim,tabnim,mask=masky)
+#                        tabover=cv2.add(outy,tabover)
+                        tabover=cv2.add(vis,tabover)
 
+                        
+                        
+                        tabover=tagviewct(tabover,p,0,100) 
+#                        cv2.imshow(p,masky)
+#                        cv2.imshow('tabsroi',tabsroi)
+#                        cv2.imshow('tabover',tabover)
+#                        cv2.waitKey(0)
+#                        cv2.destroyAllWindows()
+                textw='n: '+tail+' scan: '+str(sliceNumberS)
+                tabover= tagviewst(tabover,textw,0,20)
                 imtowrite=cv2.add(tabscanc,tabover)
                 imtowrite = cv2.cvtColor(imtowrite,cv2.COLOR_RGB2BGR)
                 cv2.imwrite(nameover,imtowrite)
@@ -500,8 +533,6 @@ listdirc= (os.listdir(namedirtopc))
 for f in listdirc:
     #f = 35
     print('work on:',f)
-
-    nbpf=0
     namedirtopcf=os.path.join(namedirtopc,f) 
     
     bmp_dir = os.path.join(namedirtopcf, bmpname)
@@ -555,7 +586,6 @@ for f in listdirc:
 #        print('listcore',listcore)
     for c in listcore:
 #            print c
-        ftab=True
         tabzc = np.zeros((dimtabx, dimtaby), dtype='i')
         imgc = np.zeros((dimtabx,dimtaby,3), np.uint8)
         for l in listslice:
@@ -575,8 +605,8 @@ for f in listdirc:
                 locaposend=t.find('\n',locapos)
                 locaposdeb = t.find(' ',locapos)
                 loca=t[locaposdeb:locaposend].strip()
-
-                tabccfi=tabcff/coefi
+#                print 'fx',fx
+                tabccfi=fx*tabcff/coefi
 
                 tabc=tabccfi.astype(int)
 
