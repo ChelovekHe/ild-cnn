@@ -1,5 +1,5 @@
 # coding: utf-8
-#Sylvain Kritter 12 decembre 2016
+#Sylvain Kritter 22 decembre 2016
 """generate roi for segmentation"""
 import os
 import numpy as np
@@ -251,9 +251,9 @@ def reptfulle(tabc,dx,dy):
     imgi = np.zeros((dx,dy,3), np.uint8)
     cv2.polylines(imgi,[tabc],True,(1,1,1)) 
     cv2.fillPoly(imgi,[tabc],(1,1,1))
-    tabzi = np.array(imgi)
-    tabz = tabzi[:, :,1]   
-    return tabz, imgi
+#    tabzi = np.array(imgi)
+#    tabz = tabzi[:, :,1]   
+    return imgi
     
 
 def tagviewb(fig,label,x,y):
@@ -400,28 +400,14 @@ def geneOverlay (namedirtopcf):
                 for p in  classifcseg:
                     greylevel=classifcseg[p]
                     g3=(greylevel,greylevel,greylevel)
-                    masky=cv2.inRange(tabsroi,g3,g3)
-                    
+                    masky=cv2.inRange(tabsroi,g3,g3)                    
                     vis=contour3(masky,p)
-#                    colMask=classifc[p]
-#                    colMaskt=(int(colMask[0]/att),int(colMask[1]/att),int(colMask[2]/att))
 
                     if masky.max()>0:
-                        
-#                        new_im = Image.new('RGB', (dimtabx,dimtaby),colMaskt)
-#                        tabnim=np.array(new_im)
-#                        outy=cv2.bitwise_and(tabnim,tabnim,mask=masky)
-#                        tabover=cv2.add(outy,tabover)
-                        tabover=cv2.add(vis,tabover)
 
-                        
-                        
+                        tabover=cv2.add(vis,tabover)                        
                         tabover=tagviewct(tabover,p,0,100) 
-#                        cv2.imshow(p,masky)
-#                        cv2.imshow('tabsroi',tabsroi)
-#                        cv2.imshow('tabover',tabover)
-#                        cv2.waitKey(0)
-#                        cv2.destroyAllWindows()
+
                 textw='n: '+tail+' scan: '+str(sliceNumberS)
                 tabover= tagviewst(tabover,textw,0,20)
                 imtowrite=cv2.add(tabscanc,tabover)
@@ -586,7 +572,7 @@ for f in listdirc:
 #        print('listcore',listcore)
     for c in listcore:
 #            print c
-        tabzc = np.zeros((dimtabx, dimtaby), dtype='i')
+#        tabzc = np.zeros((dimtabx, dimtaby), dtype='i')
         imgc = np.zeros((dimtabx,dimtaby,3), np.uint8)
         for l in listslice:
 #                print('l',l,'c:',c)
@@ -611,9 +597,9 @@ for f in listdirc:
                 tabc=tabccfi.astype(int)
 
                 print('generate tables from:',l,'in:', f)
-                tabz,imgi= reptfulle(tabc,dimtabx,dimtaby)                
+                imgi= reptfulle(tabc,dimtabx,dimtaby)                
                 imgc=imgc+imgi                    
-                tabzc=tabz+tabzc
+#                tabzc=tabz+tabzc
                             
 #                    print('end create tables')
                 il=l.find('.',0)
