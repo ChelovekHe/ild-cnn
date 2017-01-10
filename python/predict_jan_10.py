@@ -1,3 +1,5 @@
+# coding: utf-8
+#Sylvain Kritter 10 January 2017
 import os
 from PIL import Image
 import dicom
@@ -20,18 +22,16 @@ print('SUCCESS:   this is the predict.py file answering')
 # add path of where flask should look
 flaskapp_dir = '/var/www/html/flaskapp'
 #flaskapp_dir = '/Users/peterhirt/googleCloud/server-ml/flaskapp'
-flaskapp_dir = 'C:/Users/sylvain/Documents/boulot/startup/radiology/web/microserver-ml/flaskapp'
-
+#flaskapp_dir = 'C:/Users/sylvain/Documents/boulot/startup/radiology/web/microserver-ml/flaskapp'
 #
 picklefile_source = 'pickle_source'  # subdirectory name to collect weights
-picklefile_source = 'pickle_ex54'
+#picklefile_source = 'pickle_ex54'
 # patch size in pixels example 32 * 32
 dimpavx = 16
 dimpavy = 16
 
 namedirtop = 'predict_file'   # global directory for predict file
-# namedirtop='predict_23'   # global directory for predict file
-volumeweb = 'volumeweb1'
+
 lungmask = 'lung_mask'        # directory with lung mask dicom
 lungmask_bmp = 'bmp'  # extension for lung mask_bmp if exists
 picklein_file = os.path.join(flaskapp_dir, picklefile_source)
@@ -50,8 +50,9 @@ subErosion = 15  # erosion factor for subpleura in mm
 imageDepth = 8191  # number of bits used on dicom images (2 **n) 13 bits
 
 #
-writeFile = True  # allows to write file with UIP volume calculation
-excluvisu = ['back_ground', 'healthy']  # excluded in visu
+writeFile = False  # allows to write file with UIP volume calculation
+volumeweb = 'volumeweb'  #directory  where to put volume data text file if writeFile is True
+
 pxy = float(dimpavx * dimpavy)
 ##########################################################################
 # END OF PARAMETERS
@@ -778,29 +779,26 @@ def doVolume(pid):
                 patchPositions, patchArea = generate_patches(
                     tail, dataSlice, listLung)  # generate patches for each slices
                 probabilities_raw = ILDCNNpredict(patchArea)
-#                cv2.imshow('listLung',listLung)
-#                cv2.waitKey(0)
-#                cv2.destroyAllWindows()
                 dictP, dictSubP, dictPS = uipTree(pid, probabilities_raw, patchPositions,
                                                   listLung, dataSlice, tabMed[scn[2]], psp, dictP, dictSubP, dictPS, sizeScan)     # generate dictionary with volume
 
 #        print path_patient,pid
-        if writeFile:
-            volumefile = writedict(pid, path_patient, dimpavx)
-        else:
-            volumefile = ''
-        for pat in usedclassifUIP:
-            dictSurf = cvs(
-                pat,
-                volumefile,
-                dictP,
-                dictSubP,
-                dictPS,
-                dictSurf,
-                writeFile)
-        if writeFile:
-            volumefile.write('---------------------\n')
-            volumefile.close()
+                if writeFile:
+                    volumefile = writedict(pid, path_patient, dimpavx)
+                else:
+                    volumefile = ''
+                for pat in usedclassifUIP:
+                    dictSurf = cvs(
+                        pat,
+                        volumefile,
+                        dictP,
+                        dictSubP,
+                        dictPS,
+                        dictSurf,
+                        writeFile)
+                if writeFile:
+                    volumefile.write('---------------------\n')
+                    volumefile.close()
         else:
             print ('ERROR detected: no dicom file in :', path_patient)
     else:
@@ -890,9 +888,7 @@ def doPrediction(data, pid):
                                         ]}
             else:
                 print (
-                    'ERROR detected: scan Number :',
-                    data,
-                    ' does not exist')
+                    'ERROR detected: scan Number :', data, ' does not exist')
         else:
             print ('ERROR detected: no dicom file in :', path_patient)
     else:
