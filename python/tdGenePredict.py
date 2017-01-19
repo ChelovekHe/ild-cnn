@@ -1,8 +1,6 @@
 # coding: utf-8
-'''create dataset from patches using split into 3 bmp databases and
- augmentation only on training, using bg, bg number limited to max and with equalization
- for all in training, validation and test
- defined used pattern set, define upsampling
+#sylvain Kritter 19-jan-2017
+'''3 dpredict on lung
  '''
 import os
 import cv2
@@ -28,6 +26,7 @@ K.set_image_dim_ordering('th')
 from keras.models import load_model
 import cnn_model as CNN4
 import time
+from time import time as mytime
 
 
 def remove_folder(path):
@@ -36,7 +35,7 @@ def remove_folder(path):
     if os.path.exists(path):
          # remove if exists
          shutil.rmtree(path)
-
+t0=mytime()
 #####################################################################
 #define the working directory
 globalHist=True 
@@ -45,6 +44,7 @@ normiInternal =True
 isGre=False
 HUG='predict_23d'   
 HUG='predict_106530'   
+HUG='predict_S14740' 
 
 #HUG='HUG'
 #subDir='ILDt'
@@ -263,9 +263,11 @@ def normi(tabi):
     
      max_val=float(np.max(tabi))
      min_val=float(np.min(tabi))
-     
+    
+     mm=max_val-min_val
+     mm=max(mm,1.0)
 #     print 'tabi1',min_val, max_val,imageDepth/float(max_val)
-     tabi2=(tabi-min_val)*(imageDepth/(max_val-min_val))
+     tabi2=(tabi-min_val)*(imageDepth/mm)
      tabi2=tabi2.astype('uint16')
 
      return tabi2
@@ -333,17 +335,11 @@ def genebmp(fn):
         dsr= RefDs.pixel_array
         dsr= dsr-dsr.min()
         dsr=dsr.astype('uint16')
-##        min_val=np.min(dsr)
-        
            
         slicenumber=int(RefDs.InstanceNumber)
         endnumslice=l.find('.dcm') 
         imgresize=cv2.resize(dsr,None,fx=fxs,fy=fxs,interpolation=cv2.INTER_LINEAR)
-#         
-#            np.putmask(imgresize,imgresize==1,0)
-#            np.putmask(imgresize,imgresize>1,255)
-            
-    #        cv2.imwrite(bmpfile, imgresize)
+
         imgcoreScan=l[0:endnumslice]+'_'+str(slicenumber)+'.'+typei
     #            print 'imgcore' , imgcore
         bmpfile=os.path.join(fmbmp,imgcoreScan)
@@ -358,19 +354,18 @@ def genebmp(fn):
     
 def genebmplung(fn,lungname,slnt,dimtabx,dimtaby):
     """generate patches from dicom files"""
-    
+
     print ('load dicom files for lung in :',fn)
     (top,tail) =os.path.split(fn)
-#    sroidir=os.path.join(top,sroi)
-    #directory for patches
+   
     fmbmp=os.path.join(fn,lungname)
-
     fmbmpbmp=os.path.join(fmbmp,lung_namebmp)
 #    print fmbmpbmp
     remove_folder(fmbmpbmp)
+    
     os.mkdir(fmbmpbmp)
+#    print 'aa'
     listdcm=[name for name in  os.listdir(fmbmp) if name.lower().find('.dcm')>0]
-   
    
     tabscan = np.zeros((slnt,dimtabx,dimtaby), np.uint8)
     for l in listdcm:
@@ -781,20 +776,6 @@ def  visua(dirf,probaInput,patch_list,dimtabx,dimtaby,slnt,predictout,sroi,scan_
 
         vis=drawContour(imgt,listlabel,dimtabx,dimtaby)
 
-#put to zero the contour in image in order to get full visibility of contours
-#        img2gray = cv2.cvtColor(vis,cv2.COLOR_BGR2GRAY)
-#        ret, mask = cv2.threshold(img2gray, 10, 255, cv2.THRESH_BINARY)
-#        mask_inv = cv2.bitwise_not(mask)
-#        tablscan=cv2.cvtColor(tablscan,cv2.COLOR_BGR2GRAY)
-#        mask_inv=cv2.cvtColor(mask_inv,cv2.COLOR_GRAY2BGR)
-#
-#        
-##        tablscan=tablscan.astype('uint8')
-##        mask_inv=mask_inv.astype('uint8')
-##        print tablscan.shape, mask_inv.shape
-#        img1_bg = cv2.bitwise_and(tablscan,tablscan,mask = mask_inv) 
-
-#        img1_bg=cv2.cvtColor(img1_bg,cv2.COLOR_GRAY2BGR)
         imn=cv2.add(tablscan,vis)
 
         if foundp:
@@ -828,9 +809,9 @@ def  visua(dirf,probaInput,patch_list,dimtabx,dimtaby,slnt,predictout,sroi,scan_
     for classlabel in listlabelf:  
           listelabelfinal[classlabel]=listlabelf[classlabel]
           print 'patient: ',dptail,', label:',classlabel,': ',listlabelf[classlabel]
-          string=str(classlabel)+': '+str(listlabelf[classlabel])+'\n' 
+          stringtw=str(classlabel)+': '+str(listlabelf[classlabel])+'\n' 
 #          print string
-          errorfile.write(string )
+          errorfile.write(stringtw )
     return sliceok
 
 def genethreef(dirpatientdb,patchPositions,probabilities_raw,slicepitch,dimtabx,dimtaby,dimpavx,lsn,v):
@@ -1177,6 +1158,7 @@ for f in listHug:
         
         tabscanScan,slnt,dimtabx,slicepitch=genebmp(dirf)
         ##slnt= number of slices +1
+#        print 'dirf', dirf
         tabscanLung=genebmplung(dirf,lung_name_gen,slnt,dimtabx,dimtabx)
 
         patch_list=pavgene(dirf,dimtabx,dimtabx,tabscanScan,tabscanLung,slnt,jpegpath)
@@ -1214,6 +1196,8 @@ for f in listHug:
 
     errorfile.write('completed :'+f)
     errorfile.close()  
-errorfile.close()        
+errorfile.close()      
+print "predict time:",round(mytime()-t0,3),"s"
+  
 #bglist=listcl()
 #ILDCNNpredict(bglist)
