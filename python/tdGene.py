@@ -1,5 +1,6 @@
 # coding: utf-8
-'''create patches from paytient on front view
+'''create patches from patient on front view
+    sylvain kritter 19 janvier 2017
  '''
 import os
 import cv2
