@@ -1,6 +1,6 @@
 # coding: utf-8
-'''create patches from patient on front view
-    sylvain kritter 19 janvier 2017
+'''create patches from patient on front view, no overlapping ROI
+    sylvain kritter 06 february 2017
  '''
 import os
 import cv2
@@ -17,9 +17,6 @@ import scipy
 import PIL
 from PIL import Image, ImageFont, ImageDraw
 
-
-
-
 def remove_folder(path):
     """to remove folder"""
     # check if folder exists
@@ -32,10 +29,12 @@ def remove_folder(path):
 toppatch= 'TOPPATCH'
     
 #extension for output dir
+#extendir='0'
 extendir='0'
 reservedDir=['bgdir','sroi','sroi1','bgdir3d','sroi3d']
 #alreadyDone =['S1830','S14740','S15440','S28200','S106530','S107260','S139430','S145210']
-alreadyDone =[]
+alreadyDone =['S106530','S107260','S139430','S145210','S14740','S15440','S1830','S28200','S335940','S359750']
+alreadyDone=[]
 
 notclas=['lung','source','B70f']
 
@@ -44,8 +43,8 @@ HUG='CHU'
 #HUG='HUG'
 #subDir='ILDt'
 subDir='UIPt'
-#subDir='UIP_106530'
-
+#subDir='UIP'
+#subDir='UIP_S14740'
 
 scan_bmp='scan_bmp'
 transbmp='trans_bmp'
@@ -66,8 +65,8 @@ dimpavx=16
 dimpavy=16
 pxy=float(dimpavx*dimpavy)
 #imageDepth=65535 #number of bits used on dicom images (2 **n) 13 bits
-imageDepth=8191 #number of bits used on dicom images (2 **n) 13 bits
-#imageDepth=255 #number of bits used on dicom images (2 **n) 13 bits
+#imageDepth=8191 #number of bits used on dicom images (2 **n) 13 bits
+imageDepth=255 #number of bits used on dicom images (2 **n) 13 bits
 #patch overlapp tolerance
 thrpatch = 0.8
 
@@ -85,9 +84,6 @@ cwd=os.getcwd()
 (cwdtop,tail)=os.path.split(cwd)
 dirHUG=os.path.join(cwdtop,HUG)
 patchtoppath=os.path.join(dirHUG,patchesdirnametop)
-
-
-
 
 
 dirHUG=os.path.join(dirHUG,subDir)
@@ -127,8 +123,8 @@ eferror=os.path.join(patchtoppath,'genepatcherrortop3d.txt')
 
     
     
-picklein_file = '../pickle_ex/pickle_ex53'
-modelname='ILD_CNN_model.h5'
+#picklein_file = '../pickle_ex/pickle_ex59'
+#modelname='ILD_CNN_model.h5'
 avgPixelSpacing=0.734   # average pixel spacing
 ###############################################################
 classif ={
@@ -242,42 +238,26 @@ def normi(tabi):
     
      max_val=float(np.max(tabi))
      min_val=float(np.min(tabi))
-     
+    
+     mm=max_val-min_val
+     mm=max(mm,1.0)
 #     print 'tabi1',min_val, max_val,imageDepth/float(max_val)
-     tabi2=(tabi-min_val)*(imageDepth/(max_val-min_val))
+     tabi2=(tabi-min_val)*(imageDepth/mm)
      tabi2=tabi2.astype('uint16')
 
      return tabi2
      
 def reshapeScan(tabscan,slnt,dimtabx,slicepitch):
-#    slnt=2
-#    dimtabx=3
-#    tabscan=np.arange(0,18)
-#    print tabscan
-#    tabscan=np.reshape(tabscan,(2,3,3))
-#    print tabscan
-#    ooo
-##    tabscan=np.reshape(tabscan,(2,3,2))
-#    print tabscan
+
     tabres = np.zeros((dimtabx,slnt,dimtabx), np.uint16)
-#    print tabscan
-#    tabscan[0][0][1]=1
-#    print tabscan
-#    x = np.array([[1,2,3]])
-#    print x
-#    print x[0][0]
-#    y=np.swapaxes(x,0,1)
-#    print y
+
     for i in range (0,dimtabx):
         for j in range (0,slnt):
             tabres[i][j]=tabscan[j][i]
-            
-#    print tabres
-#    ooo
+
     return tabres
         
-#remove_folder(pickle_dir)
-#os.mkdir(pickle_dir)  
+ 
 def genebmp(fn):
     """generate patches from dicom files"""
     
@@ -818,7 +798,10 @@ for f in listHug:
     if isGre:
         dirg=os.path.join(dirf,source_name)
         tabscan,slnt,dimtabx,slicepitch=genebmp(dirg)
+        print tabscan.shape,tabscan.max()
         tabres=reshapeScan(tabscan,slnt,dimtabx,slicepitch)
+        print tabres.shape,tabres.max()
+        ooo
         dimtabx,dimtaby=wtebres(dirg,tabres,dimtabx,slicepitch)
 
         dirg=os.path.join(dirf,lung_name)
@@ -843,7 +826,7 @@ for f in listHug:
         wtebres(dirf,tabres,dimtabx,slicepitch)
         pavs(dirg,dimtabx,dimtaby)
         pavbg(dirg,dimtabx,dimtaby)
-    errorfile.write('completed :'+f)
+    errorfile.write('completed :'+f+'\n')
     errorfile.close()  
 errorfile.close()        
 #bglist=listcl()
