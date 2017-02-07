@@ -29,8 +29,8 @@ def remove_folder(path):
 toppatch= 'TOPPATCH'
     
 #extension for output dir
-#extendir='0'
-extendir='3d162'
+extendir='0'
+#extendir='3d162'
 reserved=['bgdir','sroi','sroi1','bgdir3d','sroi3d']
 #alreadyDone =['S1830','S14740','S15440','S28200','S106530','S107260','S139430','S145210']
 alreadyDone =['S106530','S107260','S139430','S145210','S14740','S15440','S1830','S28200','S335940','S359750']
@@ -47,18 +47,19 @@ HUG='CHU'
 #HUG='HUG'
 #subDir='ILDt'
 #subDir='UIPtt'
-subDir='UIP'
-#subDir='UIP_S14740'
+subDir='UIPt'
+subDir='UIP_S14740'
+#subDir='UIP_106530'
 
 scan_bmp='scan_bmp'
 transbmp='trans_bmp'
 sroid='sroi3d'
 bgdir='bgdir3d'
 
-typei='jpg'
-typeroi='jpg'
-typeid='png' #can be png for 16b
-typej='jpg'
+typei='bmp'
+typeroi='bmp'
+typeid='bmp' #can be png for 16b
+typej='bmp'
 
 source_name='source'
 lung_name='lung'
@@ -70,7 +71,7 @@ dimpavy=16
 pxy=float(dimpavx*dimpavy)
 #imageDepth=65535 #number of bits used on dicom images (2 **n) 13 bits
 imageDepth=8191 #number of bits used on dicom images (2 **n) 13 bits
-#imageDepth=255 #number of bits used on dicom images (2 **n) 13 bits
+imageDepth=255 #number of bits used on dicom images (2 **n) 13 bits
 #patch overlapp tolerance
 thrpatch = 0.8
 
@@ -367,8 +368,10 @@ def genebmp(dirName, sou,slnt,dx,dy):
 #                    bmpfile=os.path.join(dirFilePbmp,imgcore)
                     
                       
-                    if sou =='source':
-                        print 'source'
+                    if sou !='source':
+                        
+                        np.putmask(dsrresize,dsrresize==1,0)
+                        np.putmask(dsrresize,dsrresize>0,100)
 #                        imgcored=imgcoredeb+typeid                   
 #                        bmpfiled=os.path.join(dirFilePbmp,imgcored)                 
 #                        cv2.imwrite (bmpfiled, dsrresize,[int(cv2.IMWRITE_PNG_COMPRESSION),0])  
@@ -376,12 +379,8 @@ def genebmp(dirName, sou,slnt,dx,dy):
                     elif sou == 'lung':
 
                         np.putmask(dsrresize,dsrresize>0,100)
-#                        cv2.imwrite (bmpfile, dsrresize)
+#                        cv2.imwrite (bmpfile, dsrresize
 
-                    else:
-
-                        np.putmask(dsrresize,dsrresize==1,0)
-                        np.putmask(dsrresize,dsrresize>0,100)
 #                        cv2.imwrite (bmpfile, dsrresize)
                     tabres[scanNumber-1]=  dsrresize
 
@@ -443,16 +442,17 @@ def tagview(tab,label,x,y):
     return viseg
 
            
-def pavs (dirName,pat,dxtd,dx,dy):
+def pavs (dirName,pat,dx,dy):
     """ generate patches from ROI"""
-   
+#    print dx,dy
     ntotpat=0    
-    tabf=np.zeros((dxtd,dx,dy),np.uint8)
-    _tabsroi=np.zeros((dxtd,dx,dy,3),np.uint8)
-    _tabbg = np.zeros((dxtd,dx,dy),np.uint8)
+    tabf=np.zeros((dx,dy),np.uint8)
+#    print 'tabf', tabf.shape
+    _tabsroi=np.zeros((dx,dy,3),np.uint8)
+    _tabbg = np.zeros((dx,dy),np.uint8)
     _tabscan = np.zeros((dx,dy),np.uint16)
     (top,tail)=os.path.split(dirName)
-    print 'pav :',tail,'pattern :',pat
+#    print 'pav :',tail,'pattern :',pat
     pxy=float(dimpavx*dimpavy)
             
     nampadir=os.path.join(patchpath,pat)
@@ -466,10 +466,11 @@ def pavs (dirName,pat,dxtd,dx,dy):
          os.mkdir(nampaNormdir)           
          os.mkdir(nampadirNorml)                     
 
-    for scannumb in range (0,dxtd):
+    for scannumb in range (0,dy):
        tabp = np.zeros((dx, dy), dtype=np.uint8)
+#       print 'tabp',tabp.shape
        tabf=np.copy(tabroipat3d[pat][scannumb])
-
+#       print 'tabf', tabf.shape
        tabfc=np.copy(tabf)
        nbp=0
        if tabf.max()>0:    
@@ -516,7 +517,8 @@ def pavs (dirName,pat,dxtd,dx,dy):
                 ymax=atabf[0].max()
 
                 np.putmask(tabf,tabf>0,1)
-                _tabscan=tabscan3d[scannumb]                 
+                _tabscan=tabscan3d[scannumb] 
+#                print '_tabscan',_tabscan.shape                
                  
                 i=xmin
                 while i <= xmax:
@@ -585,13 +587,13 @@ def pavs (dirName,pat,dxtd,dx,dy):
 
     return ntotpat
 
-def pavbg (dirName,dxtd,dx,dy):
+def pavbg (dirName,dx,dy):
     """ generate patches back-ground from ROI"""
 #    print 'pavbg :',dirName,'pattern : back_ground'
     ntotpat=0    
-    tabf=np.zeros((dxtd,dx,dy),np.uint8)
+    tabf=np.zeros((dx,dy,),np.uint8)
 #    _tabsbg3d=np.zeros((dxtd,dx,dy),np.uint8)
-    _tabscan = np.zeros((dxtd,dx,dy),np.uint16)
+    _tabscan = np.zeros((dx,dy),np.uint16)
     (top,tail)=os.path.split(dirName)
     print 'pavbg :',tail,'pattern : back_ground'
     pxy=float(dimpavx*dimpavy)
@@ -607,7 +609,7 @@ def pavbg (dirName,dxtd,dx,dy):
          os.mkdir(nampaNormdir)           
          os.mkdir(nampadirNorml)                     
          
-    for scannumb in range (0,dxtd):
+    for scannumb in range (0,dy):
         if scannumb in listsliceok:
            tabp = np.zeros((dx, dy), dtype=np.uint8)
     
@@ -730,7 +732,7 @@ def wtebres(dirf,tab,dx,slicepitch,fxs,dxd):
     bgdirf=os.path.join(top,bgdir)
     sroidir=os.path.join(top,sroid)
 
-    for i in range (0,dimtabx):
+    for i in range (0,dx):
         if tab[i].max()>1:
 #            print tab[i].max()
 #            print tab[i].shape
@@ -854,6 +856,7 @@ for f in listHug:
     errorfile = open(eferror, 'a')
     dirf=os.path.join(dirHUG,f)
     sroidir=os.path.join(dirf,sroid)
+#    print sroidir
     remove_folder(sroidir)
     os.mkdir(sroidir)
     bgdirf=os.path.join(dirf,bgdir)
@@ -888,7 +891,8 @@ for f in listHug:
         tabscan=genebmp(dirf, source_name,slnt,dimtabx,dimtaby)       
         tabres=reshapeScan(tabscan,slnt,dimtabx)   
         tabscan3d,tabsroi3d,a=wtebres(dirg,tabres,dimtabx,slicepitch,fxs,dimtabxd)
-
+#        print tabscan3d.shape,tabsroi3d.shape
+#        ooo
         dirg=os.path.join(dirf,lung_name)
         tabslung=genebmp(dirf, lung_name,slnt,dimtabx,dimtaby)   
         tabres=reshapeScan(tabslung,slnt,dimtabx)
@@ -909,9 +913,9 @@ for f in listHug:
                 dirg=os.path.join(dirf,g)
                 tabres=reshapeScan(tabroipat[g],slnt,dimtabx)
                 tabroipat3d[g],a,a=wtebres(dirg,tabres,dimtabx,slicepitch,fxs,dimtabxd)
-                nbp=pavs(dirf,g,dimtabxd,dimtabxd,dimtabyd)
+                nbp=pavs(dirf,g,dimtabxd,dimtabyd)
  
-        pavbg(dirf,dimtabxd,dimtabxd,dimtabyd)
+        pavbg(dirf,dimtabxd,dimtabyd)
     else:
        print 'is not gre'
     errorfile.write('completed :'+f+'\n')
