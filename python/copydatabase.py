@@ -7,11 +7,11 @@ import shutil
 #global environment
 
 source='CHU'
-patchsource='TOPPATCH_16_set0_gci'
-patsonorm='patches_norm'
+patchsource='TOPPATCH_16_set0_13b2'
+patsonorm='patches'
 dest='HUG'
-patchdestT='TOPPATCH_16_set0_gci'
-patchdest='patches_norm'
+patchdestT='TOPPATCH_16_set0_13b2'
+patchdest='patches'
 
 
 #########################################################################
@@ -25,10 +25,49 @@ destdir=os.path.join(top,dest)
 destdir1=os.path.join(destdir,patchdestT)
 destdir=os.path.join(destdir1,patchdest)
 
+usedclassif = [
+        'back_ground',
+        'consolidation',
+        'HC',
+        'ground_glass',
+        'healthy',
+        'micronodules',
+        'reticulation',
+        'air_trapping',
+        'cysts',
+        'bronchiectasis',
+        'emphysema',
+        'HCpret',
+        'HCpbro',
+        'GGpbro',
+        'GGpret',
+        'bropret'
+        ]
+
+def remove_folder(path):
+    """to remove folder"""
+    # check if folder exists
+    if os.path.exists(path):
+         # remove if exists
+         shutil.rmtree(path)
+#usedclassif = [
+#            'back_ground',
+#            'consolidation',
+#            'HC',
+#            'ground_glass',
+#            'healthy',
+#            'micronodules',
+#            'reticulation',
+#            'air_trapping',
+#            'cysts',
+#            'bronchiectasis'
+#            ]
 print sourcedir,destdir
 
-listsource=os.listdir(sourcedir)
-print listsource
+category_list=os.listdir(sourcedir)
+print 'category_list',category_list
+listsource=[f for f in usedclassif if f in category_list]
+print 'listsource',listsource
 for l in listsource:
     print l
     sourcedirl = os.path.join(sourcedir,l)
@@ -38,7 +77,11 @@ for l in listsource:
       sourcedirk = os.path.join(sourcedirl,k)
       desdirl = os.path.join(destdir,l)
       destdirk = os.path.join(desdirl,k)
+      remove_folder(destdirk)
+#      remove_folder(desdirl)
 #      print l, k,sourcedirk,destdirk
+      if not os.path.exists(desdirl):          
+          os.mkdir(desdirl)  
       if not os.path.exists(destdirk):          
           os.mkdir(destdirk)     
       listsourcem=os.listdir(sourcedirk)
