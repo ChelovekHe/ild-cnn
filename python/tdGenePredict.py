@@ -1,6 +1,6 @@
 # coding: utf-8
-#sylvain Kritter 19-jan-2017
-'''3 dpredict on lung
+#sylvain Kritter 07-feb-2017
+'''predict on lung scan front view and cross view
  '''
 import os
 import cv2
@@ -42,14 +42,17 @@ globalHist=True
 contrast=False
 normiInternal =True
 isGre=False
-HUG='predict_23d'   
-HUG='predict_106530'   
-HUG='predict_S14740' 
+#HUG='predict_23d'   
+#HUG='predict_S106530'   
+#HUG='predict_S14740' 
+HUG='predict_S15440'
 
 #HUG='HUG'
 #subDir='ILDt'
 predictout='predicted_results'
 predictout3d='predicted_results_3d'
+predictout3dn='predicted_results_3dn'
+predictout3d1='predicted_results_3dn1'
 predictout3dr='predicted_results_3dr'
 predictoutmerge='predicted_results_merge'
 source_name='source'
@@ -68,15 +71,21 @@ bgdir='bgdir3d'
 
 typei='jpg'
 typeid='jpg' #can be png for 16b
-typej='jpg'
-typeiroi='bmp'
+typej='bmp'
+typeiroi1='jpg'
+typeiroi2='bmp'
+
 excluvisu=['back_ground','healthy']
+#excluvisu=['back_ground','healthy','consolidation','HC','ground_glass','micronodules','reticulation',
+#           'air_trapping','cysts',  'bronchiectasis']
+#excluvisu=['back_ground','healthy','consolidation','micronodules','reticulation',
+#           'air_trapping','cysts',  'bronchiectasis']
 #excluvisuh=['bronchiectasis']
 #excluvisu=[]
 excluvisuh=[]
 
 
-
+htmldir='html'
 threeFileTxt='uip.txt'
 threeFile='uip.html'
 threeFilejs='world.js'
@@ -100,33 +109,27 @@ pxy=float(dimpavx*dimpavy)
 imageDepth=8191 #number of bits used on dicom images (2 **n) 13 bits
 #imageDepth=255 #number of bits used on dicom images (2 **n) 13 bits
 #patch overlapp tolerance
-thrpatch = 0.99 #threshold for pad acceptance (recovery)
+thrpatch = 0.8 #threshold for pad acceptance (recovery)
 thrproba =0.5 #thresholm proba for generation of predicted images
-thrprobaUIP=0.6 #threshold proba for UIP
+thrprobaUIP=0.5 #threshold proba for UIP
+thrprobaMerge=0.5 #threshold proba for UIP
 
 cwd=os.getcwd()
 (cwdtop,tail)=os.path.split(cwd)
 dirHUG=os.path.join(cwdtop,HUG)
 
-
 listHug= [ name for name in os.listdir(dirHUG) if os.path.isdir(os.path.join(dirHUG, name)) ]
 
 print listHug
 
-
 font5 = ImageFont.truetype( 'arial.ttf', 5)
 font10 = ImageFont.truetype( 'arial.ttf', 10)
 font20 = ImageFont.truetype( 'arial.ttf', 20)
-#create patch and jpeg directory
-
-#remove_folder(jpegpath)
 
 eferror=os.path.join(dirHUG,'genepatcherrortop3d.txt')
-
-    
-    
-picklein_file = '../pickle_ex/pickle_ex53'
-picklein_file_front = '../pickle_ex/pickle_ex59'
+   
+picklein_file = '../pickle_ex/pickle_ex61'
+picklein_file_front = '../pickle_ex/pickle_ex63'
 modelname='ILD_CNN_model.h5'
 avgPixelSpacing=0.734   # average pixel spacing
 ###############################################################
@@ -181,8 +184,8 @@ usedclassif = [
         'reticulation',
         'air_trapping',
         'cysts',
-        'bronchiectasis',
-        'emphysema'
+        'bronchiectasis'
+#        ,'emphysema'
         ]
 red=(255,0,0)
 green=(0,255,0)
@@ -252,11 +255,14 @@ classifc ={
 #print patch_dir
 def rsliceNum(s,c,e):
     endnumslice=s.find(e)
-    posend=endnumslice
-    while s.find(c,posend)==-1:
-        posend-=1
-    debnumslice=posend+1
-    return int((s[debnumslice:endnumslice])) 
+    if endnumslice <0:
+        return -1
+    else:
+        posend=endnumslice
+        while s.find(c,posend)==-1:
+            posend-=1
+        debnumslice=posend+1
+        return int((s[debnumslice:endnumslice])) 
 
 def normi(tabi):
      """ normalise patches"""
@@ -275,9 +281,12 @@ def normi(tabi):
 def reshapeScan(tabscan,slnt,dimtabx):
     print 'reshape'
     tabres = np.zeros((dimtabx,slnt,dimtabx), np.uint16)
+
     for i in range (0,dimtabx):
-        for j in range (0,slnt):
+        for j in range (1,slnt):
+
             tabres[i][j]=tabscan[j][i]
+
     return tabres
         
 #remove_folder(pickle_dir)
@@ -294,27 +303,29 @@ def genebmp(fn):
     os.mkdir(fmbmp)
     listdcm=[name for name in  os.listdir(fn) if name.lower().find('.dcm')>0]
    
-    FilesDCM =(os.path.join(fn,listdcm[0]))  
-    #           
+    FilesDCM =(os.path.join(fn,listdcm[0]))            
     RefDs = dicom.read_file(FilesDCM)
-    #    print RefDs
     SliceThickness=RefDs.SliceThickness
     try:
-            SliceSpacingB=RefDs. SpacingBetweenSlices
+            SliceSpacingB=RefDs.SpacingBetweenSlices
     except AttributeError:
              print "Oops! No Slice spacing..."
              SliceSpacingB=0
-    
-    slicepitch=float(SliceThickness)+float(SliceSpacingB)
+             
+#    if float(SliceSpacingB)>0:
+#        slicepitch=float(SliceSpacingB)
+#    else:
+#        slicepitch=float(SliceThickness)
     print SliceThickness
     print SliceSpacingB
+    slicepitch=float(SliceThickness)+float(SliceSpacingB)
     print 'slice pitch in z :',slicepitch
     fxs=float(RefDs.PixelSpacing[0])/avgPixelSpacing 
     dsr= RefDs.pixel_array
     imgresize=cv2.resize(dsr,None,fx=fxs,fy=fxs,interpolation=cv2.INTER_LINEAR)
     dimtabx=imgresize.shape[0]
     dimtaby=imgresize.shape[1]
-    print dimtabx, dimtaby
+#    print dimtabx, dimtaby
     slnt=0
     for l in listdcm:
         
@@ -350,6 +361,7 @@ def genebmp(fn):
 #            if tail =='lung':
 #                imgresize = normi(imgresize) 
         tabscan[slicenumber]=imgresize
+#        print slicenumber
     return tabscan,slnt,dimtabx,slicepitch
     
 def genebmplung(fn,lungname,slnt,dimtabx,dimtaby):
@@ -368,6 +380,7 @@ def genebmplung(fn,lungname,slnt,dimtabx,dimtaby):
     listdcm=[name for name in  os.listdir(fmbmp) if name.lower().find('.dcm')>0]
    
     tabscan = np.zeros((slnt,dimtabx,dimtaby), np.uint8)
+    
     for l in listdcm:
 #        print l
         FilesDCM =(os.path.join(fmbmp,l))  
@@ -593,8 +606,11 @@ def wtebres(dirf,tab,dimtabx,slicepitch,lungm,ty):
     remove_folder(bgdirf)
     os.mkdir(bgdirf)
     fxs=float(slicepitch/avgPixelSpacing )
+   
 #    print tab[0].shape[0]
     ntd=int(round(fxs*tab[0].shape[0],0))
+#    print  fxs,slicepitch,ntd,avgPixelSpacing,tab[0].shape[0],dimtabx
+    
     if ty=='scan':
         tabres=np.zeros((dimtabx,ntd,dimtabx),np.uint16)
     else:
@@ -604,9 +620,10 @@ def wtebres(dirf,tab,dimtabx,slicepitch,lungm,ty):
         if tab[i].max()>0:
 #            print tab[i].max()
 #            print tab[i].shape
-            
+        
             imgresize=cv2.resize(tab[i],None,fx=1,fy=fxs,interpolation=cv2.INTER_LINEAR)
-#            print i, imgresize.min(), imgresize.max()
+#            print i, imgresize.min(), imgresize.max(),imgresize.shape
+#            ooo
 #            print dimtabx,fxs,imgresize.shape,tab[i].shape
 
             if ty=='scan':
@@ -723,7 +740,9 @@ def  visua(dirf,probaInput,patch_list,dimtabx,dimtaby,slnt,predictout,sroi,scan_
         if sroiE:
             for imgsroi in listbmpsroi:
 #                print imgsroi
-                slicenumbersroi=rsliceNum(imgsroi,'_','.'+typeiroi)
+                slicenumbersroi=rsliceNum(imgsroi,'_','.'+typeiroi1)
+                if slicenumbersroi <0:
+                    slicenumbersroi=rsliceNum(imgsroi,'_','.'+typeiroi2)
                 if slicenumbersroi==slicenumber:
                     imgc=os.path.join(dirpatientfsdb,imgsroi)
                     break
@@ -775,7 +794,7 @@ def  visua(dirf,probaInput,patch_list,dimtabx,dimtaby,slnt,predictout,sroi,scan_
         tablscan = cv2.cvtColor(tablscan, cv2.COLOR_BGR2RGB)
 
         vis=drawContour(imgt,listlabel,dimtabx,dimtaby)
-
+#        print vis.shape,tablscan.shape
         imn=cv2.add(tablscan,vis)
 
         if foundp:
@@ -816,8 +835,12 @@ def  visua(dirf,probaInput,patch_list,dimtabx,dimtaby,slnt,predictout,sroi,scan_
 
 def genethreef(dirpatientdb,patchPositions,probabilities_raw,slicepitch,dimtabx,dimtaby,dimpavx,lsn,v):
         """generate  voxels for 3d view"""
+        print 'generate voxels for :',v
         (dptop,dptail)=os.path.split(dirpatientdb)
         pz=slicepitch/avgPixelSpacing
+        htmldifr=os.path.join(dirpatientdb,htmldir)
+        if not os.path.exists(htmldifr):
+            os.mkdir(htmldifr)
         cwd=os.getcwd()
         souuip=os.path.join(cwd,threeFileTop)
 #        print souuip
@@ -846,11 +869,11 @@ def genethreef(dirpatientdb,patchPositions,probabilities_raw,slicepitch,dimtabx,
             BGx=str(round(pz,3))
             BGz=str(dimpavx)
     
-        desouip=os.path.join(dirpatientdb,threeFilel)
+        desouip=os.path.join(htmldifr,threeFilel)
         shutil.copyfile(souuip,desouip)                    
-        volumefileT = open(os.path.join(dirpatientdb,threeFileTxtl), 'w')                  
-        jsfilel=os.path.join(dirpatientdb,jsfile)
-        volumefile = open(os.path.join(dirpatientdb,threeFilel), 'a')
+        volumefileT = open(os.path.join(htmldifr,threeFileTxtl), 'w')                  
+        jsfilel=os.path.join(htmldifr,jsfile)
+        volumefile = open(os.path.join(htmldifr,threeFilel), 'a')
         volumefilejs = open(jsfilel, 'w')
 #        jsfilel.replace("\\","/")
 #        print jsfilel
@@ -902,6 +925,9 @@ def genethreef(dirpatientdb,patchPositions,probabilities_raw,slicepitch,dimtabx,
 #            print '1', mproba
 #            print classif[nset],nset,prec
             classlabel=fidclass(prec,classif) 
+#            if classlabel=='back_ground':
+#                print classlabel, mproba
+                
 
             bm=volcol[classlabel]            
             bmn = 'boxMesh'+str(ll)
@@ -918,12 +944,12 @@ def genethreef(dirpatientdb,patchPositions,probabilities_raw,slicepitch,dimtabx,
                  +', "class": "'+classlabel+'", "proba": '+str(mproba)+' }')
 
             volumefilejs.write( 'var newMaterial= '+bm+'.clone();\n'); 
-            if mproba>= thrprobaUIP:
+            if mproba>= thrprobaUIP-0.05: #for rounding
 #                print '2', mproba
 #                mproba=(mproba-thrprobaUIP)/thrprobaUIP
                 volumefilejs.write( 'newMaterial.opacity= '+str(mproba)+';\n'); 
             else:
-                volumefilejs.write( 'newMaterial.opacity= 0;\n'); 
+                volumefilejs.write( 'newMaterial.opacity= 0.1;\n'); 
             volumefilejs.write( bmn+' = new THREE.Mesh(boxGeometry,newMaterial)\n'); 
             volumefilejs.write( bmn+'.position.set('+str(xpat)+', '+str(ypat)+','+str(zpa)+');\n')
             volumefilejs.write('scene.add('+bmn+');\n') 
@@ -938,31 +964,149 @@ def genethreef(dirpatientdb,patchPositions,probabilities_raw,slicepitch,dimtabx,
         vtb.close()
         volumefilejs.close()
 
-def genecross(proba_front,patch_list_front,slnt,slicepitch,dimtabx,dimtaby):
-    proba_cross_gene=[]
-    patch_list_cross_gene=[]
-    slicewidth={}
-#    tab=np.zeros((dimtabx,dimtaby),np.uint8)
-    for i in range (1, slnt):
-        imin=(i-1)*slicepitch
-        imax=i*slicepitch
-        slicewidth[i]=(imin,imax)
-    for i in range (1, slnt):    
-        for ll in range(0,len(patch_list_front)):             
-            ypat=patch_list_front[ll][2]*avgPixelSpacing
-            if ypat>= slicewidth[i][0] and ypat< slicewidth[i][1]:
-                proba=proba_front[ll]          
-                prec, mprobai = maxproba(proba)
-                if mprobai>thrprobaUIP:
-                    patch_list_cross_gene.append((i,patch_list_front[ll][1],patch_list_front[ll][0]))
-                    proba_cross_gene.append(proba_front[ll])
-#                  print i, ll[1],ll[2],ypat
-#                  tab[ll[2]:ll[2]+dimpavy,ll[1]:ll[1]+dimpavx]=100
-#                  cv2.imshow('tab',tab)
-#                  cv2.waitKey(0)    
-#                  cv2.destroyAllWindows()
-#                  ooo
-    return proba_cross_gene,patch_list_cross_gene
+def genecross(dirf,proba_front,patch_list_front,slnt,slicepitch,dimtabx,dimtaby,predictout):
+    """generate cross view from front patches"""    
+    print 'genecross'
+    (dptop,dptail)=os.path.split(dirf)
+    predictout_dir = os.path.join(dirf, predictout)
+#    print predictout_dir
+    remove_folder(predictout_dir)
+    os.mkdir(predictout_dir) 
+    plf=patch_list_front
+    prf=proba_front
+    plfd={}
+    prfd={}
+    tabpatch={}
+    
+    listp=[name for name in usedclassif if name not in excluvisu] 
+    print 'used patterns :',listp
+   
+    for i in usedclassif:
+        plfd[i]=[]
+        prfd[i]=[]
+  
+    probabg=createProba('back_ground',0.1,proba_cross[0])
+
+    for ll in range(0,len(plf)):  
+        proba=prf[ll]          
+        prec, mprobai = maxproba(proba)
+        classlabel=fidclass(prec,classif) 
+        if mprobai> thrprobaUIP:
+            plfd[classlabel].append(plf[ll])
+            prfd[classlabel].append(prf[ll])
+        else:
+            plfd['back_ground'].append(plf[ll])
+            prfd['back_ground'].append(probabg)
+            
+            
+    for i in listp:
+        tabres=np.zeros((dimtaby,dimtabx,dimtaby,3),np.uint8)
+        tabpatch[i]=np.zeros((dimtaby,dimtabx,dimtaby,3),np.uint8)
+        for ll in range(0,len(plfd[i])):  
+            pz=plfd[i][ll][0]
+            py=plfd[i][ll][2]
+            px=plfd[i][ll][1]
+#            print i,pz,py,px,dimtabx,dimtaby
+            tabres[pz,py:py+dimpavy,px:px+dimpavx]= classifc[i]    
+            tabpatch[i]=tabres
+#            print tabpatch[i].shape
+    
+        for scan in range(0,dimtaby):
+            if tabpatch[i][scan].max()>0:
+                pf=os.path.join(predictout_dir,i+'_'+str(scan)+'.'+typei)
+                cv2.imwrite(pf,tabpatch[i][scan])
+#        cv2.imshow('tabpatch',tabpatch[i][200])
+#        cv2.waitKey(0)    
+#        cv2.destroyAllWindows()
+    return tabpatch
+
+def tagviewct(tab,label,x,y):
+    """write text in image according to label and color"""
+
+    col=classifc[label]
+    labnow=classif[label]
+#    print (labnow, label)
+    if label == 'back_ground':
+        x=0
+        y=0        
+        deltay=60
+    else:        
+        deltay=10*(labnow-1)
+        deltax=100*(labnow/5)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    viseg=cv2.putText(tab,label,(x+deltax, y+deltay), font,0.3,col,1)
+#    viseg = cv2.cvtColor(viseg,cv2.COLOR_RGB2BGR)
+    return viseg
+
+
+
+def reshapepatern(dirf,tabpx,dimtabxn,dimtaby,slnt,slicepitch,predictout):
+    print 'reshape pattern'
+    """reshape pattern table """   
+    (dptop,dptail)=os.path.split(dirf)
+    predictout_dir = os.path.join(dirf, predictout)
+#    print predictout_dir
+    remove_folder(predictout_dir)
+    os.mkdir(predictout_dir) 
+    listp=[name for name in usedclassif if name not in excluvisu] 
+    print 'used patterns :',listp
+    fxs=float(avgPixelSpacing/slicepitch )
+    dirpatientfdb=os.path.join(dirf,scan_bmp)
+    dirpatientfsdb=os.path.join(dirf,sroi)
+    listbmpscan=os.listdir(dirpatientfdb)
+#    print dirpatientfdb
+    tablscan=np.zeros((slnt,dimtaby,dimtaby,3),np.uint8)
+    sroiE=False
+    if os.path.exists(dirpatientfsdb):
+        sroiE=True
+        listbmpsroi=os.listdir(dirpatientfsdb)
+  
+    for img in listbmpscan:
+        slicenumber= rsliceNum(img,'_','.'+typei)
+#        print dirpatientfsdb,dirpatientfdb
+        if sroiE:
+            for imgsroi in listbmpsroi:
+#                print imgsroi
+                slicenumbersroi=rsliceNum(imgsroi,'_','.'+typeiroi1)
+                if slicenumbersroi <0:
+                    slicenumbersroi=rsliceNum(imgsroi,'_','.'+typeiroi2)
+                
+                if slicenumbersroi==slicenumber:
+                    imgc=os.path.join(dirpatientfsdb,imgsroi)
+                    break
+        else:
+            imgc=os.path.join(dirpatientfdb,img)
+        tablscan[slicenumber]=cv2.imread(imgc,1)
+    tabresshape = np.zeros((slnt,dimtaby,dimtaby,3), np.uint8) 
+    impre = np.zeros((slnt,dimtaby,dimtaby,3), np.uint8)
+    tabx={}
+    for i in listp:
+        tabx[i]=np.zeros((slnt,dimtaby,dimtaby), np.uint8)
+        tabres=np.zeros((dimtaby,dimtabxn,dimtaby,3),np.uint8)
+        tabrisize=np.zeros((dimtaby,slnt,dimtaby,3),np.uint8)
+    
+        for j in range(0,dimtaby):
+                tabres[j]=tabpx[i][j]      
+                tabrisize[j]=cv2.resize( tabres[j],None,fx=1,fy=fxs,interpolation=cv2.INTER_LINEAR)
+                
+        for t in range (0,slnt):
+            for u in range (0,dimtaby):                     
+                tabresshape[t][u]=tabrisize[u][t]
+            tabx[i][t]=cv2.cvtColor(tabresshape[t], cv2.COLOR_BGR2GRAY)
+            np.putmask(tabx[i][t],tabx[i][t]>0,100)
+            if tabresshape[t].max()>0:
+                    tabresshape[t]=tagviewct( tabresshape[t],i,100,10)           
+            impre[t]=cv2.add(impre[t],tabresshape[t])               
+      
+    for scan in range(0,slnt):
+                pf=os.path.join(predictout_dir,'tr_'+str(scan)+'.'+typei)
+                imcolor = cv2.cvtColor(impre[scan], cv2.COLOR_BGR2RGB)
+#                print tablscan[scan].shape,imcolor.shape
+#                imcolor=tagviewct(imcolor,i,0,0)
+                cv2.imwrite(pf,cv2.add(imcolor,tablscan[scan]))
+           
+    return tabx
+
 
 def createProba(pat,pr,px):
     n=classif[pat]
@@ -977,14 +1121,21 @@ def createProba(pat,pr,px):
     return proba
 
     
-def pavf(pat,scan,tab,dimpavx,dimpavy,dimtabx,dimtaby,jpegpath,patch_list,proba_list): 
+def pavf(pat,scan,tab,dimpavx,dimpavy,dimtabx,dimtaby,jpegpath,patch_list,proba_list,bg): 
 #     print 'pav merge', pat,scan
      tabfw=np.zeros((dimtabx,dimtaby,3),np.uint8)
      jpegpathdir=os.path.join(dirf,jpegpath)
      if not os.path.exists(jpegpathdir):
          os.mkdir(jpegpathdir)   
      tabbc=np.copy(tab)
-     tabr=np.copy(tab)
+     kernele=np.ones((5,5),np.uint8)
+#     kernelc=np.ones((3,3),np.uint8)
+     kerneld=np.ones((5,5),np.uint8)
+     
+     dilatation = cv2.dilate(tabbc,kerneld,iterations = 1)
+     tabbc = cv2.erode(dilatation,kernele,iterations = 1)    
+
+     tabr=np.copy(tabbc)
      tabr= cv2.cvtColor(tabr,cv2.COLOR_GRAY2BGR)
      atabf = np.nonzero(tab)
      pxy=float(dimpavx*dimpavy)
@@ -994,6 +1145,8 @@ def pavf(pat,scan,tab,dimpavx,dimpavy,dimtabx,dimtaby,jpegpath,patch_list,proba_
      xmax=atabf[1].max()
      ymin=atabf[0].min()
      ymax=atabf[0].max()
+     probadef=createProba(pat,thrprobaUIP+0.05,proba_cross[0])
+     probadefbg=createProba(pat,0.1,proba_cross[0])
     
      i=xmin
      while i < xmax:
@@ -1004,11 +1157,13 @@ def pavf(pat,scan,tab,dimpavx,dimpavy,dimtabx,dimtaby,jpegpath,patch_list,proba_
              area= tabpatch.sum()  
              targ=float(area)/pxy
                  
-             if targ>thrpatch:
+             if targ>thrprobaMerge:
 #                print i,j,targ,area
                 patch_list.append((scan,i,j))
-                proba_list.append(createProba(pat,thrprobaUIP,proba_cross[0]))
-
+                if not bg:
+                    proba_list.append(probadef)                    
+                else:
+                    proba_list.append(probadefbg)
                 tabbc[j:j+dimpavy,i:i+dimpavx]=0
                 x=0
                 while x < dimpavx:                                   
@@ -1021,9 +1176,9 @@ def pavf(pat,scan,tab,dimpavx,dimpavy,dimtabx,dimtaby,jpegpath,patch_list,proba_
                             else:
                                 y+=dimpavy-1
                         x+=1                                             
-                j+=dimpavy-1
-             j+=1
-         i+=1
+#                j+=dimpavy-1
+             j+=dimpavy
+         i+=dimpavx
 
      nameslijpeg=pat+'s_'+str(scan)+'.'+typej
      namepatchImage=os.path.join(jpegpathdir,nameslijpeg)
@@ -1040,35 +1195,23 @@ def pavf(pat,scan,tab,dimpavx,dimpavy,dimtabx,dimtaby,jpegpath,patch_list,proba_
      scipy.misc.imsave(namepatchImage,tabjpeg)
      return proba_list,patch_list
      
-def mergeproba(prx,plx,prg,plg,slnt,dimtabx,dimtaby)  :  
+def mergeproba(prx,plx,tabx,slnt,dimtabx,dimtaby)  :  
     print "merge proba list"
     
     patch_list_merge=[]
     proba_merge=[]
-    plgd={}
+    
     plxd={}
-    prgd={}
     prxd={}
     
-    listp=[name for name in usedclassif if name not in excluvisu]  
+    listp=[name for name in usedclassif if name not in excluvisu] 
+    print 'used patterns :',listp
    
     for i in usedclassif:
-        plgd[i]=[]
+      
         plxd[i]=[]
-        prgd[i]=[]
         prxd[i]=[]
-    probabg=createProba('back_ground',thrprobaUIP,proba_cross[0])
-    print 'sort plg'
-    for ll in range(0,len(plg)):  
-        proba=prg[ll]          
-        prec, mprobai = maxproba(proba)
-        classlabel=fidclass(prec,classif) 
-        if mprobai> thrprobaUIP:
-            plgd[classlabel].append(plg[ll])
-            prgd[classlabel].append(prg[ll])
-        else:
-            plgd['back_ground'].append(plg[ll])
-            prgd['back_ground'].append(probabg)
+    probabg=createProba('back_ground',0.1,proba_cross[0])
    
     print 'sort plx'    
     for ll in range(0,len(plx)):  
@@ -1087,22 +1230,27 @@ def mergeproba(prx,plx,prg,plg,slnt,dimtabx,dimtaby)  :
     for p in listp:
 #        print p
         for i in range (1, slnt): 
-            tab0=np.zeros((dimtabx,dimtaby),np.uint8)
+#            tab0=np.zeros((dimtabx,dimtaby),np.uint8)
             tab1=np.zeros((dimtabx,dimtaby),np.uint8)
-            tab2=np.zeros((dimtabx,dimtaby),np.uint8)
-            for ll in range(0,len(plgd[p])):
-                if plgd[p][ll][0]==i:                    
-                    tab0[plgd[p][ll][2]:plgd[p][ll][2]+dimpavy,plgd[p][ll][1]:plgd[p][ll][1]+dimpavx]=100          
+            tab2=np.zeros((dimtabx,dimtaby),np.uint8)                 
+            tab0=  tabx[p][i]  
             for ll in range(0,len(plxd[p])):                
                 if plxd[p][ll][0]==i:
                     tab1[plxd[p][ll][2]:plxd[p][ll][2]+dimpavy,plxd[p][ll][1]:plxd[p][ll][1]+dimpavx]=100
             tab2=np.bitwise_and(tab0,tab1)
+#            if i ==25 and p =='ground_glass':
+#                 cv2.imshow('tab0',tab0)
+#                 cv2.imshow('tab1',tab1)
+#                 cv2.imshow('tab2',tab2)
+#                 cv2.waitKey(0)    
+#                 cv2.destroyAllWindows()
+#                
             nz= np.count_nonzero(tab2)
             if nz>0:
-                proba_merge,patch_list_merge=pavf(p,i,tab2,dimpavx,dimpavy,dimtabx,dimtaby,jpegpadirm,patch_list_merge,proba_merge)
+                proba_merge,patch_list_merge=pavf(p,i,tab2,dimpavx,dimpavy,dimtabx,dimtaby,jpegpadirm,patch_list_merge,proba_merge,False)
     print 'merge exclu'
     for p in excluvisu:
-#        print p
+        print'excluvisu', p
         for i in range (1, slnt): 
             tab2=np.zeros((dimtabx,dimtaby),np.uint8)
             for ll in range(0,len(plxd[p])):                
@@ -1110,7 +1258,9 @@ def mergeproba(prx,plx,prg,plg,slnt,dimtabx,dimtaby)  :
                     tab2[plxd[p][ll][2]:plxd[p][ll][2]+dimpavy,plxd[p][ll][1]:plxd[p][ll][1]+dimpavx]=100
             nz= np.count_nonzero(tab2)
             if nz>0:
-                proba_merge,patch_list_merge=pavf(p,i,tab2,dimpavx,dimpavy,dimtabx,dimtaby,jpegpadirm,patch_list_merge,proba_merge)
+                proba_merge,patch_list_merge=pavf(p,i,tab2,dimpavx,dimpavy,dimtabx,dimtaby,jpegpadirm,patch_list_merge,proba_merge,True)
+                 
+    print ' end excluvisu'
 #                if len(pr)>0:
 #                    proba_merge.append(pr)
 #                    patch_list_merge.append(pl)
@@ -1129,46 +1279,54 @@ for f in listHug:
     wridir=os.path.join(dirf,transbmp)
     remove_folder(wridir)
     os.mkdir(wridir)
+    jpegpathdir=os.path.join(dirf,jpegpadirm)
+    remove_folder(jpegpathdir)
+    os.mkdir(jpegpathdir) 
 #    bgdirf=os.path.join(dirf,bgdir)
 #    remove_folder(bgdirf)
 #    os.mkdir(bgdirf)   
 #    listsliceok=[]
     if isGre:
-        dirg=os.path.join(dirf,source_name)
-        tabscan,slnt,dimtabx,slicepitch=genebmp(dirg)
-        tabres=reshapeScan(tabscan,slnt,dimtabx)
-        dimtabx,dimtaby=wtebres(dirg,tabres,dimtabx,slicepitch)
-
-        dirg=os.path.join(dirf,lung_name)
-        tabscan,slnt,dimtabx,slicepitch=genebmp(dirg)
-        tabres=reshapeScan(tabscan,slnt,dimtabx)
-        dimtabx,dimtaby=wtebres(dirg,tabres,dimtabx,slicepitch)
-        listdirf=[name for name in os.listdir(dirf) if name in usedclassif]
-        print listdirf
-        for g in listdirf:           
-            
-            dirg=os.path.join(dirf,g)
-            print g
-            
-            tabscan,slnt,dimtabx,slicepitch=genebmp(dirg)
-            tabres=reshapeScan(tabscan,slnt,dimtabx,slicepitch)
-            dimtabx,dimtaby=wtebres(dirg,tabres,dimtabx,slicepitch)
+        print 'is gre'
+#        dirg=os.path.join(dirf,source_name)
+#        tabscan,slnt,dimtabx,slicepitch=genebmp(dirg)
+#        tabres=reshapeScan(tabscan,slnt,dimtabx)
+#        dimtabx,dimtaby,a=wtebres(dirg,tabres,dimtabx,slicepitch)
+#
+#        dirg=os.path.join(dirf,lung_name)
+#        tabscan,slnt,dimtabx,slicepitch=genebmp(dirg)
+#        tabres=reshapeScan(tabscan,slnt,dimtabx)
+#        dimtabx,dimtaby,a=wtebres(dirg,tabres,dimtabx,slicepitch)
+#        listdirf=[name for name in os.listdir(dirf) if name in usedclassif]
+#        print listdirf
+#        for g in listdirf:           
+#            
+#            dirg=os.path.join(dirf,g)
+#            print g
+#            
+#            tabscan,slnt,dimtabx,slicepitch=genebmp(dirg)
+#            tabres=reshapeScan(tabscan,slnt,dimtabx,slicepitch)
+#            dimtabx,dimtaby,a=wtebres(dirg,tabres,dimtabx,slicepitch)
 
     else:
-        
+#        
         tabscanScan,slnt,dimtabx,slicepitch=genebmp(dirf)
-        ##slnt= number of slices +1
-#        print 'dirf', dirf
+#        
+###        ##slnt= number of slices +1
+#####        print 'dirf', dirf        
         tabscanLung=genebmplung(dirf,lung_name_gen,slnt,dimtabx,dimtabx)
-
+#
         patch_list=pavgene(dirf,dimtabx,dimtabx,tabscanScan,tabscanLung,slnt,jpegpath)
         model=modelCompilation('cross')
         proba=ILDCNNpredict(patch_list,model)
         pickle.dump(proba, open( os.path.join(dirf,"proba_cross"), "wb" ))
         pickle.dump(patch_list, open( os.path.join(dirf,"patch_list_cross"), "wb" ))
+        
         sliceok = visua(dirf,proba,patch_list,dimtabx,dimtabx,slnt,predictout,sroi,scan_bmp)
+##        
         tabresScan=reshapeScan(tabscanScan,slnt,dimtabx)
         dimtabxn,dimtabyn,tabScan3d=wtebres(dirf,tabresScan,dimtabx,slicepitch,lung_name_gen,'scan')
+#        
         tabresLung=reshapeScan(tabscanLung,slnt,dimtabx)
         dimtabxn,dimtabyn,tabLung3d=wtebres(dirf,tabresLung,dimtabx,slicepitch,lung_name_gen,'lung')
         
@@ -1177,20 +1335,26 @@ for f in listHug:
         proba=ILDCNNpredict(patch_list,model)
         pickle.dump(proba, open( os.path.join(dirf,"proba_front"), "wb" ))
         pickle.dump(patch_list, open( os.path.join(dirf,"patch_list_front"), "wb" ))
-
+       
         visua(dirf,proba,patch_list,dimtabxn,dimtabx,dimtabyn,predictout3d,sroid,transbmp)
-#        
+#####        
         proba_cross=pickle.load(open( os.path.join(dirf,"proba_cross"), "rb" ))
         patch_list_cross=pickle.load(open( os.path.join(dirf,"patch_list_cross"), "rb" ))
         proba_front=pickle.load(open( os.path.join(dirf,"proba_front"), "rb" ))
         patch_list_front=pickle.load(open( os.path.join(dirf,"patch_list_front"), "rb" ))
-
+     
         genethreef(dirf,patch_list_cross,proba_cross,slicepitch,dimtabx,dimtabx,dimpavx,slnt,'cross')
         genethreef(dirf,patch_list_front,proba_front,avgPixelSpacing,dimtabxn,dimtabyn,dimpavx,dimtabx,'front')
-        proba_cross_gene,patch_list_cross_gene=genecross(proba_front,patch_list_front,slnt,slicepitch,dimtabxn,dimtabyn)
-        visua(dirf,proba_cross_gene,patch_list_cross_gene,dimtabx,dimtabx,slnt,predictout3dr,sroi,scan_bmp)
-        proba_merge,patch_list_merge=mergeproba(proba_cross,patch_list_cross,proba_cross_gene,patch_list_cross_gene,slnt,dimtabx,dimtabx)
-#        print proba_merge
+        
+        tabpx=genecross(dirf,proba_front,patch_list_front,slnt,slicepitch,dimtabxn,dimtabyn,predictout3dn)
+        tabx=reshapepatern(dirf,tabpx,dimtabxn,dimtabx,slnt,slicepitch,predictout3d1)
+        pickle.dump(tabpx, open( os.path.join(dirf,"tabpx"), "wb" ))
+        pickle.dump(tabx, open( os.path.join(dirf,"tabx"), "wb" ))
+        tabpx=pickle.load(open( os.path.join(dirf,"tabpx"), "rb" ))
+        tabx=pickle.load(open( os.path.join(dirf,"tabx"), "rb" ))
+        
+        proba_merge,patch_list_merge=mergeproba(proba_cross,patch_list_cross,tabx,slnt,dimtabx,dimtabx)
+
         visua(dirf,proba_merge,patch_list_merge,dimtabx,dimtabx,slnt,predictoutmerge,sroi,scan_bmp)
         genethreef(dirf,patch_list_merge,proba_merge,slicepitch,dimtabx,dimtabx,dimpavx,slnt,'merge')
 
