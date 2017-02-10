@@ -1,8 +1,8 @@
 # coding: utf-8
 #Sylvain Kritter 5 octobre 2016
-"""Top file to generate patches from DICOM database 
-use full range of dicom
-equalization from cv2"""
+"""Top file to generate patches from DICOM database use full range of dicom
+    equalization from cv2 or internal
+    DO not include new patterns when patterns are super imposed, cross view"""
 import os
 import numpy as np
 import shutil
@@ -20,23 +20,23 @@ import matplotlib.pyplot as plt
 namedirHUG = 'HUG'
 #subdir for roi in text
 subHUG='ILD_TXT'
-subHUG='ILDtt'
+subHUG='ILDt1'
 
 
 toppatch= 'TOPPATCH'  
 #extension for output dir
-extendir='16_set0_gci_16b'
-extendir='essai'
+#extendir='16_set0_13b'
+extendir='2'
 #normalization internal procedure or openCV
-normiInternal=True# when True: use internal normi, otherwise opencv equalhist
+normiInternal=True# when True: use internal normi for patches, otherwise opencv equalhist
 globalHist=True #use histogram equalization on full image
 globalHistInternal=True #use internal for global histogram when True otherwise opencv
 #patch overlapp tolerance
 thrpatch = 0.8
 #labelEnh=('consolidation','reticulation,air_trapping','bronchiectasis','cysts')
 labelEnh=()
-imageDepth=65535 #number of bits used on dicom images (2 **n) 13 bits
-#imageDepth=1023 #number of bits used on dicom images (2 **n)
+#imageDepth=65535 #number of bits used on dicom images (2 **n) 16 bits
+imageDepth=8191 #number of bits used on dicom images (2 **n) 13 bits
 
 # average pxixel spacing
 avgPixelSpacing=0.734
@@ -354,25 +354,10 @@ def genebmp(dirName):
     for filename in fileList:
 #        print(filename)
 #        if ".dcm" in filename.lower():  # check whether the file's DICOM
-            FilesDCM =(os.path.join(dirName,filename))  
-#           
+            FilesDCM =(os.path.join(dirName,filename))             
             ds = dicom.read_file(FilesDCM)
             dsr= ds.pixel_array   
-#            minds=dsr.min()
-#            maxds=dsr.max()
-#            dshs=int(ds.BitsStored)
-#            imageDepth=int(math.pow(2,dshs)-1)
-#            print dshs,imageDepth,minds,maxds
-        
-#            n, bins, patches = plt.hist(dsr)
-#            plt.show()
             dsr= dsr-dsr.min()
-#            minds=dsr.min()
-#            maxds=dsr.max()
-#            
-#            print minds,maxds
-#            c=float(imageDepth)/dsr.max()
-#            dsr=dsr*c
             if imageDepth <256:
                 dsr=dsr.astype('uint8')
             else:
@@ -387,16 +372,10 @@ def genebmp(dirName):
 #            print 'imgcore' , imgcore
             bmpfile=os.path.join(bmp_dir,imgcoreScan)
             dsrresize1=cv2.resize(dsr,None,fx=fxs,fy=fxs,interpolation=cv2.INTER_LINEAR)
-#            minds=dsrresize1.min()
-#            maxds=dsrresize1.max()
-#            print minds,maxds 
 #         
             namescan=os.path.join(sroidir,imgcoreRoi)                   
             textw='n: '+f+' scan: '+str(scanNumber)
-#            scipy.misc.imsave(bmpfile,dsrresize1)
-#            orign = Image.open(bmpfile)
-#            imscanc= orign.convert('RGB')
-#            tablscan = np.array(imscanc)
+
             tablscan=cv2.cvtColor(dsrresize1,cv2.COLOR_GRAY2BGR)
             scipy.misc.imsave(namescan, tablscan)
             tagviews(namescan,textw,0,20)  
@@ -405,36 +384,23 @@ def genebmp(dirName):
             if globalHist:
                 if globalHistInternal:
                     dsrresize = normi(dsrresize1)
-
                 else:
-                   dsrresize= cv2.normalize(dsrresize1, 0, imageDepth,cv2.NORM_MINMAX);
-#                   
-#                    dsrresize = cv2.equalizeHist(dsrresize1) 
+                   dsrresize= cv2.normalize(dsrresize1, 0, imageDepth,cv2.NORM_MINMAX,dtype=cv2.CV_32F);
             else:
                 dsrresize=dsrresize1
-#            minds=dsrresize.min()
-#            maxds=dsrresize.max()
-#            print minds,maxds
-#            ooo
-            cv2.imwrite (bmpfile, dsrresize,[int(cv2.IMWRITE_PNG_COMPRESSION),0])
-#            orign = cv2.imread(bmpfile,cv2.IMREAD_ANYDEPTH)
 
+            cv2.imwrite (bmpfile, dsrresize,[int(cv2.IMWRITE_PNG_COMPRESSION),0])
             dimtabx=dsrresize.shape[0]
             dimtaby=dimtabx
-
                         
 #             print(lung_bmp_dir)
     for lungfile in lunglist:
-#             print(lungfile)
-#             if ".dcm" in lungfile.lower():  # check whether the file's DICOM
+
                  lungDCM =os.path.join(lung_dir,lungfile)  
                  dslung = dicom.read_file(lungDCM)
-#                 print dslung
+
                  dsrlung= dslung.pixel_array  
-#                 cv2.imshow('dsrlung1',dsrlung) 
-#                 cv2.waitKey(0)    
-#                 cv2.destroyAllWindows()   
-#                 print dsrlung.min(),dsrlung.max()          
+       
                  dsrlung= dsrlung-dsrlung.min()
 #                 print dsrlung.min(),dsrlung.max()
 #                 ooo
@@ -462,14 +428,9 @@ def genebmp(dirName):
                  lungresize=cv2.resize(dsrlung,None,fx=fxslung,fy=fxslung,interpolation=cv2.INTER_LINEAR)
                  lungresize = cv2.blur(lungresize,(5,5))                 
                  np.putmask(lungresize,lungresize>0,100)
-#                 cv2.imshow('lungresize',lungresize) 
-#                 cv2.waitKey(0)    
-#                 cv2.destroyAllWindows() 
-#                 ooo
+
                  scipy.misc.imsave(lungcoref,lungresize)
-#                 cv2.imwrite(lungcoref,lungresize)
                  bgdirflm=os.path.join(bgdirf,lungcore)
-##                 print lungcoref,bgdirflm                 
                  scipy.misc.imsave(bgdirflm,lungresize)
 
     
@@ -507,16 +468,15 @@ def tagview(fig,label,x,y):
     draw = ImageDraw.Draw(imgn)
     col=classifc[label]
     labnow=classif[label]
-#    print (labnow, text)
+    print (labnow, label)
     if label == 'back_ground':
         x=2
         y=0        
         deltax=0
         deltay=60
     else:        
-        deltay=25*((labnow-1)%5)
-#        deltax=175*((labnow-1)//5)
-        deltax=80*((labnow-1)//5)
+        deltay=25*(labnow-1)
+
 
 #    print (x+deltax,y+deltay)
     draw.text((x, y+deltay),label,col,font=font10)
@@ -562,6 +522,7 @@ def pavbg(namedirtopcf,dx,dy,px,py):
           if slicen==slicenumber and slicenumber in listsliceok:
               nambmp=os.path.join(patchpathc,l)
               origbmp = Image.open(nambmp,'r')
+#              origbmp = cv2.imread(nambmp,-1)
 #              origbmpl= origbmp.convert('L')
              
               
@@ -572,6 +533,7 @@ def pavbg(namedirtopcf,dx,dy,px,py):
               min_val=np.min(origbl)
               max_val=np.max(origbl)
 #              print min_val, max_val
+#              ooo
 #              cv2.imshow('tabf',tabf) 
 ##
 #              cv2.waitKey(0)    
@@ -628,8 +590,8 @@ def pavbg(namedirtopcf,dx,dy,px,py):
                                     nbp+=1
                                     imgray =np.array(crorig)
                                     imgray=imgray.astype('uint16')
-                                    min_val=np.min(imgray)
-                                    max_val=np.max(imgray)
+#                                    min_val=np.min(imgray)
+#                                    max_val=np.max(imgray)
 #                                    print 'Image to write gray', min_val, max_val
                                     nampa='/'+labelbg+'/'+locabg+'/'+f+'_'+str(slicenumber)+'_'+str(nbp)+'.'+typeid 
                                     cv2.imwrite (patchpath+nampa, imgray,[int(cv2.IMWRITE_PNG_COMPRESSION),0])
@@ -761,9 +723,11 @@ def pavs (imgi,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
             namescan=os.path.join(sroidir,core)   
 #            namebmp=namedirtopcf+'/'+typei+'/'+n
             orig = Image.open(namebmp)
+#            orig = cv2.imread(namebmp,-1)
 #            min_val=np.min(orig)
 #            max_val=np.max(orig)
 #            print 'Image', min_val, max_val
+#            ooo
 #            orig = cv2.imread(namebmp,cv2.IMREAD_ANYDEPTH)
 #            min_val=np.min(orig)
 #            max_val=np.max(orig)
@@ -823,6 +787,7 @@ def pavs (imgi,tab,dx,dy,px,py,namedirtopcf,jpegpath,patchpath,thr,\
 
                                           
                         crorig = orig.crop((i, j, i+px, j+py))
+#                        crorig=orig[j:j+py,i:i+px]
                          #detect black pixels
                          #imagemax=(crorig.getextrema())
 #                        ttr=np.array(crorig)
@@ -1245,7 +1210,7 @@ for dirnam in dirlabel:
         n=0
         listcwd=os.listdir(subdir)
         for ff in listcwd:
-            if ff.find(typei) >0 :
+            if ff.find(typeid) >0 :
                 n+=1
                 ntot+=1
 #        print(label,loca,n) 

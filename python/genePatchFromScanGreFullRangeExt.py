@@ -22,15 +22,26 @@ namedirHUG = 'CHU'
 #subdir for roi in text
 subHUG='UIP'
 #subHUG='UIP_106530'
-subHUG='UIPt'
+#subHUG='UIPt'
 #subHUG='UIP_S14740'
 
 alreadyDone =[]
 
 toppatch= 'TOPPATCH'  
 #extension for output dir
-extendir='16_set0_13b2'
-extendir='essaiwbreak'
+extendir='16_set1_13b'
+#extendir='1'
+
+#image  patch format
+typei='jpg' #can be jpg
+typeid='png' #can be png for 16 bits
+#typeid='bmp' #can be jpg
+typej='jpg' #can be jpg
+typeroi='jpg' #can be jpg
+
+imageDepth=8191 #number of bits used on dicom images (2 **n) 13 bits
+#imageDepth=255 #number of bits used on dicom images (2 **n) 13 bits
+
 #normalization internal procedure or openCV
 normiInternal=True
 globalHist=True #use histogram equalization on full image
@@ -41,10 +52,6 @@ thrpatch = 0.8
 labelEnh=()
 # average pxixel spacing
 avgPixelSpacing=0.734
-#imageDepth=8191 #number of bits used on dicom images (2 **n) 13 bits
-#imageDepth=65535 #number of bits used on dicom images (2 **n) 16 bits
-imageDepth=8191 #number of bits used on dicom images (2 **n) 13 bits
-#imageDepth=255 #number of bits used on dicom images (2 **n) 13 bits
 
 dimpavx =16
 dimpavy = 16
@@ -81,13 +88,6 @@ path_HUG=os.path.join(cwdtop,namedirHUG)
 namedirtopc =os.path.join(path_HUG,subHUG)
 if not os.path.exists(namedirtopc):
     print('directory ',namedirtopc, ' does not exist!') 
-
-#image  patch format
-typei='jpg' #can be jpg
-typeid='png' #can be jpg
-#typeid='bmp' #can be jpg
-typej='jpg' #can be jpg
-typeroi='jpg' #can be jpg
 
 font5 = ImageFont.truetype( 'arial.ttf', 5)
 font10 = ImageFont.truetype( 'arial.ttf', 10)
@@ -343,39 +343,34 @@ def genebmp(dirName, sou):
                     if sou !='source' :
                         c=float(255)/dsr.max()
                         dsr=dsr*c     
-#                        dsr=dsr.astype('uint8')
                         dsr = dsr.astype('uint8')
                         np.putmask(dsr,dsr==1,0)
                     #resize the dicom to have always the same pixel/mm
                     fxs=float(RefDs.PixelSpacing[0])/avgPixelSpacing   
                     dsrresize1=cv2.resize(dsr,None,fx=fxs,fy=fxs,interpolation=cv2.INTER_LINEAR)
-#                    print type(dsrresize1[0][0]),sou
+
                     if sou=='source' :
                         if globalHist:
                             if globalHistInternal:
-                                dsrresize = normi(dsrresize1) 
-                                
+                                dsrresize = normi(dsrresize1)                                 
                             else:
                                 dsrresize= cv2.normalize(dsrresize1, 0, imageDepth,cv2.NORM_MINMAX);
                         else:
                             dsrresize=dsrresize1 
                     else:
                             dsrresize=dsrresize1                    
-                    
-                    #calculate the  new dimension of scan image                    
-                    scanNumber=int(RefDs.InstanceNumber)-1
+                   
+                    scanNumber=int(RefDs.InstanceNumber)
                     endnumslice=filename.find('.dcm')
                     imgcoredeb=filename[0:endnumslice]+'_'+str(scanNumber)+'.'
                     imgcore=imgcoredeb+typei
-                    
                     bmpfile=os.path.join(dirFilePbmp,imgcore)
-                    
-                      
+                                          
                     if sou =='source':
                         imgcored=imgcoredeb+typeid                   
                         bmpfiled=os.path.join(dirFilePbmp,imgcored)                 
                         cv2.imwrite (bmpfiled, dsrresize,[int(cv2.IMWRITE_PNG_COMPRESSION),0])  
-                        tabscan[scanNumber]=dsrresize
+                        tabscan[scanNumber-1]=dsrresize
                         imgcoresroi='sroi_'+str(scanNumber)+'.'+typeroi
                         bmpfileroi=os.path.join(sroidir,imgcoresroi)
                         textw='n: '+tail+' scan: '+str(scanNumber)
@@ -387,26 +382,21 @@ def genebmp(dirName, sou):
                         dsrresizer=cv2.cvtColor(dsrresizer,cv2.COLOR_GRAY2BGR)
                         dsrresizer=tagviews(dsrresizer,textw,0,20) 
                         cv2.imwrite (bmpfileroi, dsrresizer)
-                        tabsroi[scanNumber]=dsrresizer
+                        tabsroi[scanNumber-1]=dsrresizer
                     elif sou == 'lung':
                         cv2.imwrite (bmpfile, dsrresize)
                         bgfile=os.path.join(bgdirf,imgcore)
                         dsrresizer=np.copy(dsrresize)
                         np.putmask(dsrresizer,dsrresizer>0,100)
-                        tabscan[scanNumber]=dsrresizer
-                        tabbg[scanNumber]=dsrresize
+                        tabscan[scanNumber-1]=dsrresizer
+                        tabbg[scanNumber-1]=dsrresize
                         cv2.imwrite (bgfile, dsrresizer)
                     else:
                         dsrresizer=np.copy(dsrresize)
-#                        print 'dsrresizer2', sou, type(dsrresizer[0][0])
-#                        np.putmask(dsrresizer,dsrresizer==1,0)
                         np.putmask(dsrresizer,dsrresizer>0,100)
                         cv2.imwrite (bmpfile, dsrresizer)
-                        tabscan[scanNumber]=dsrresizer
-#                        print 'tabscan', sou, type(tabscan[102][0][0])
-#    print 'tabscan', sou, type(tabscan[102][0][0])
-#    if sou =='cysts':
-#        ooo
+                        tabscan[scanNumber-1]=dsrresizer
+
     return tabscan,tabsroi,tabbg 
 
 def reptfulle(tabc,dx,dy):
@@ -436,12 +426,12 @@ def tagview(tab,label,x,y):
     col=classifc[label]
     labnow=classif[label]
 #    print (labnow, text)
-    if label == 'back_ground':
-        x=0
-        y=0        
-        deltay=60
+    if label == 'back_ground':       
+        deltay=30
     else:        
-        deltay=25*((labnow-1)%5)
+#        deltay=25*((labnow-1)%5)
+        deltay=40+10*(labnow-1)
+    
     viseg=cv2.putText(tab,label,(x, y+deltay), font,0.3,col,1)
     return viseg
 

@@ -29,24 +29,21 @@ def remove_folder(path):
 toppatch= 'TOPPATCH'
     
 #extension for output dir
-#extendir='9'
+#extendir='2'
 extendir='3d162'
 
-reserved=['bgdir','sroi','sroi1','bgdir3d','sroi3d']
 #alreadyDone =['S1830','S14740','S15440','S28200','S106530','S107260','S139430','S145210']
 alreadyDone =['S106530','S107260','S139430','S145210','S14740','S15440','S1830','S28200','S335940','S359750']
 alreadyDone =[]
 
-notclas=['lung','source','B70f']
 normiInternal=True
 globalHist=True #use histogram equalization on full image
 globalHistInternal=True #use internal for global histogram when True otherwise opencv
 
-
 isGre=True
 HUG='CHU'   
 #HUG='HUG'
-#subDir='ILDt'
+#subDir='ILDt1'
 #subDir='UIPtt'
 subDir='UIP'
 #subDir='UIP_S14740'
@@ -67,6 +64,9 @@ lung_name='lung'
 labelbg='back_ground'
 locabg='td_CHUG'
 
+reserved=['bgdir','sroi','sroi1','bgdir3d','sroi3d']
+notclas=['lung','source','B70f']
+
 dimpavx=16
 dimpavy=16
 pxy=float(dimpavx*dimpavy)
@@ -84,19 +84,15 @@ patchesNormdirname = 'patches_norm'
 #define the name for jpeg files
 imagedirname='patches_jpeg'
 
-
-
 cwd=os.getcwd()
 (cwdtop,tail)=os.path.split(cwd)
 dirHUG=os.path.join(cwdtop,HUG)
 patchtoppath=os.path.join(dirHUG,patchesdirnametop)
 
-
 dirHUG=os.path.join(dirHUG,subDir)
 
 listHug= [ name for name in os.listdir(dirHUG) if os.path.isdir(os.path.join(dirHUG, name)) and \
             name not in alreadyDone]
-
 print listHug
 
 font5 = ImageFont.truetype( 'arial.ttf', 5)
@@ -277,6 +273,7 @@ def genepara(namedirtopcf):
         scanNumber=int(RefDs.InstanceNumber)
         if scanNumber>slnt:
             slnt=scanNumber
+    slnt=slnt+1
     SliceThickness=RefDs.SliceThickness
     try:
             SliceSpacingB=RefDs. SpacingBetweenSlices
@@ -349,7 +346,7 @@ def genebmp(dirName, sou,slnt,dx,dy):
                             dsrresize=dsrresize1 
                     else:
                             dsrresize=dsrresize1                    
-                    scanNumber=int(RefDs.InstanceNumber)-1
+                    scanNumber=int(RefDs.InstanceNumber)
                    
                     if sou == 'lung':
                         np.putmask(dsrresize,dsrresize>0,100)
@@ -358,7 +355,7 @@ def genebmp(dirName, sou,slnt,dx,dy):
                         np.putmask(dsrresize,dsrresize==1,0)
                         np.putmask(dsrresize,dsrresize>0,100)
                   
-                    tabres[scanNumber-1]=  dsrresize
+                    tabres[scanNumber]=  dsrresize
 
     return tabres        
  
@@ -444,10 +441,8 @@ def pavs (dirName,pat,dx,dy):
        nbp=0
        if tabf.max()>0:    
            vis=contour2(tabf,pat,dx,dy)
-           if vis.sum()>0:
-              
-                _tabsroi = np.copy(tabsroi3d[scannumb])
-             
+           if vis.sum()>0:              
+                _tabsroi = np.copy(tabsroi3d[scannumb])             
                 imn=cv2.add(vis,_tabsroi)
                 imn=tagview(imn,pat,0,20)
                 tabsroi3d[scannumb]=imn
@@ -662,6 +657,7 @@ def wtebres(dirf,tab,dx,slicepitch,fxs,dxd):
         if tab[i].max()>1:
 
             imgresize=cv2.resize(tab[i],None,fx=1,fy=fxs,interpolation=cv2.INTER_LINEAR)
+#            print imgresize.shape
 
             trcore=tail1+'_'+str(i)+'.'
             trscan=trcore+typeid
@@ -778,7 +774,7 @@ for f in listHug:
     print f
     errorfile = open(eferror, 'a')
     dirf=os.path.join(dirHUG,f)
-    
+
     sroidir=os.path.join(dirf,sroid)
     remove_folder(sroidir)
     os.mkdir(sroidir)
@@ -794,12 +790,12 @@ for f in listHug:
     if isGre:
         
         dimtabx,dimtaby,slnt,slicepitch = genepara(dirf)
-        
         tabscan =np.zeros((slnt,dimtabx,dimtaby),np.uint16)
         tabslung =np.zeros((slnt,dimtabx,dimtaby),np.uint8)
             
         fxs=float(slicepitch/avgPixelSpacing )
         dimtabxd=int(round(fxs*slnt,0))
+#        print 'dimtabxd', dimtabxd
         dimtabyd=dimtaby
         
         for i in usedclassif:
@@ -814,7 +810,8 @@ for f in listHug:
         
         dirg=os.path.join(dirf,source_name)
         tabscan=genebmp(dirf, source_name,slnt,dimtabx,dimtaby)       
-        tabres=reshapeScan(tabscan,slnt,dimtabx)   
+        tabres=reshapeScan(tabscan,slnt,dimtabx) 
+        
         tabscan3d,tabsroi3d,a=wtebres(dirg,tabres,dimtabx,slicepitch,fxs,dimtabxd)
 
         dirg=os.path.join(dirf,lung_name)
