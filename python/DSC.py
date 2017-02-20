@@ -1,5 +1,5 @@
 # coding: utf-8
-'''create dataset from patches using bg, bg number limited to max
+'''create dataset from patches using bg, bg and healthy number limited to max
  '''
 import os
 import cv2
@@ -12,20 +12,26 @@ from sklearn.cross_validation import train_test_split
 import cPickle as pickle
 #from sklearn.cross_validation import train_test_split
 import random
+import math
+from math import *
 
 #####################################################################
 #define the working directory
-HUG='CHU'   
+HUG='HUG'   
+#HUG='CHU'
 subDir='TOPPATCH'
-#extent='essai'
-extent='3d162'
+
+#extent='3d161'
+extent='16_set0_13b1'
 #extent='0'
 #wbg = True # use back-ground or not
 hugeClass=['healthy','back_ground']
-#hugeClass=['back_ground']
-upSampling=10 # define thershold for up sampling in term of ration compared to max class
+#hugeClass=[]
+imageDepth=8191 
+upSampling=1 # define thershold for up sampling in term of ration compared to max class
 subDirc=subDir+'_'+extent
-pickel_dirsource='pickle_ds63'
+pickel_dirsource='pickle_ds66'
+#pickel_dirsource='pickle_dsessai'
 name_dir_patch='patches'
 #output pickle dir with dataset   
 augf=12
@@ -33,11 +39,11 @@ augf=12
 typei='png' #can be jpg
 
 #define the pattern set
-pset=1 # 1 when with new patters superimposed
+pset=0 # 1 when with new patters superimposed
 #stdMean=True #use mean and normalization for each patch
-maxuse=True # True means that all class are upscalled to have same number of 
+#maxuse=True # True means that all class are upscalled to have same number of 
  #elements, False means that all classes are aligned with the minimum number
-useWeight=True #True means that no upscaling are done, but classes will 
+#useWeight=True #True means that no upscaling are done, but classes will 
 #be weighted ( back_ground and healthy clamped to max) 
 
 subdirc=subDir+'_'+extent
@@ -172,7 +178,21 @@ elif pset==3:
             }
 else:
             print 'eRROR :', pset, 'not allowed'
-   
+
+def normi(tabi,n):
+     """ normalise patches"""
+    
+     max_val=float(np.max(tabi))
+     min_val=float(np.min(tabi))
+    
+     mm=max_val-min_val
+     mm=max(mm,1.0)
+#     print 'tabi1',min_val, max_val,imageDepth/float(max_val)
+     tabi2=(tabi-min_val)*(n/mm)
+     tabi2=tabi2.astype('uint16')
+
+     return tabi2
+
 class_weights={}
 
 #define a dictionary with labels
@@ -216,12 +236,12 @@ print '----------'
 # 
 for category in usedclassifFinal:
     category_dir = os.path.join(patch_dir, category)
-    print  'the path into the categories is: ', category_dir
+#    print  'the path into the categories is: ', category_dir
     sub_categories_dir_list = (os.listdir(category_dir))
     #print 'the sub categories are : ', sub_categories_dir_list
     for subCategory in sub_categories_dir_list:
         subCategory_dir = os.path.join(category_dir, subCategory)
-        print  'the path into the sub categories is: ',subCategory_dir
+#        print  'the path into the sub categories is: ',subCategory_dir
         #print subCategory_dir
         image_files = [name for name in os.listdir(subCategory_dir) if name.find('.'+typei) > 0 ]              
         for filei in image_files:               
@@ -295,78 +315,138 @@ def geneaug(f,fea,lab):
         l=len(fea)
         for i in range (0,l):                                        
             # 1 append the array to the dataset list  
+            labi=lab[i]
             image=fea[i]
             feature.append(image)
-            label.append(lab[i])
+            label.append(labi)
             
 #                        #2 created rotated copies of images
             image90 = np.rot90(image)  
             feature.append(image90)
-            label.append(lab[i])
+            label.append(labi)
             
 #                        #3 created rotated copies of images                        
             image180 = np.rot90(image90)
             feature.append(image180)
-            label.append(lab[i])
+            label.append(labi)
       
 #                        #4 created rotated copies of images                                          
             image270 = np.rot90(image180)                      
             feature.append(image270) 
-            label.append(lab[i])
+            label.append(labi)
             
             #5 flip fimage left-right
             imagefliplr=np.fliplr(image)   
             feature.append(imagefliplr) 
-            label.append(lab[i])
+            label.append(labi)
             
             #6 flip fimage left-right +rot 90
             image90 = np.rot90(imagefliplr)  
             feature.append(image90)
-            label.append(lab[i])
+            label.append(labi)
             
 #                        #7 flip fimage left-right +rot 180                   
             image180 = np.rot90(image90)
             feature.append(image180)
-            label.append(lab[i])
+            label.append(labi)
       
 #                        #8 flip fimage left-right +rot 270                                          
             image270 = np.rot90(image180)                      
             feature.append(image270)  
-            label.append(lab[i])                                                             
+            label.append(labi)                                                             
                                         
             #9 flip fimage up-down
             imageflipud=np.flipud(image)                                   
             feature.append(imageflipud) 
-            label.append(lab[i])
+            label.append(labi)
             
              #10 flip fimage up-down +rot90                               
             image90 = np.rot90(imageflipud)  
             feature.append(image90)
-            label.append(lab[i])
+            label.append(labi)
             
 #                         #11 flip fimage up-down +rot180                          
             image180 = np.rot90(image90)
             feature.append(image180)
-            label.append(lab[i])
+            label.append(labi)
       
 #                        #12 flip fimage up-down +rot270                                           
             image270 = np.rot90(image180)                      
             feature.append(image270) 
-            label.append(lab[i])
+            label.append(labi)
         return feature,label
                                                
 
 def hugedata(f,fea,lab,maxl):
-    feature = random.sample(fea, maxl)
-    label=random.sample(lab, maxl)
+    if maxl<len(fea):
+        feature = random.sample(fea, maxl)
+        label=random.sample(lab, maxl)
+    else:
+        feature = fea
+        label=lab
     return feature,label
 
+def rn(x,n):
+    """ Racine n système """
+    if x == 0:
+        return 0
+    return math.exp(math.log(x) / n)
 
+
+def updscaledata(fea,lab,ups):
+    feature=[]
+    label=[]  
+    
+    for i in range (0,len(fea)):
+        img=fea[i]
+        imgd=img
+        imgm=img
+        feature.append(img)
+        label.append(lab[i])
+#        print img.min(),img.max(),int(ups)
+#        mini=img.min()
+        maxi=img.max()
+        maxscale= imageDepth/maxi
+#        print mini,maxi,maxscale, int(ups)
+        if int(ups)>1:
+#            print int(ups)
+            tm= rn(maxscale,int(ups)-1)/2+0.5
+#            td= rn(mini,int(ups)-1)
+        else:
+            tm=1
+#            td=1
+#        print t
+        for n in range (0, int(ups)-1):
+            if n%2 ==0:
+                imgm=imgm*tm
+                imgm=imgm.astype('uint16')
+#                print imgm.min(),imgm.max(),tm,td,int(ups)
+                feature.append(imgm)
+                label.append(lab[i])
+            else:
+                imgd=imgd/tm
+                imgd=imgd.astype('uint16')
+#                print imgd.min(),imgd.max(),tm,td,int(ups)
+                feature.append(imgd)
+                label.append(lab[i])
+#        ooo
+    return feature,label
+
+def updscaledataSimple(fea,lab,ups):
+    feature=[]
+    label=[]      
+    for i in range (0,len(fea)):
+        img=fea[i]
+        for n in range (0, int(ups)):
+                feature.append(img)
+                label.append(lab[i])
+    return feature,label
 
 # main program 
 feature_d ={}
 label_d={}
 dataset_listTe ={}
+print ('---')
 for f in usedclassifFinal:  
      print('genedata from images work on :',f)
      feature_d[f],label_d[f]=genedata(f)
@@ -375,9 +455,8 @@ print ('---')
 for f in usedclassifFinal:   
     print 'initial ',f,len(feature_d[f]),len(label_d[f])
 
-
 for f in hugeClass:
-     print('select random for huge data work on :',f)
+     print('select random for huge data work on :',f, 'maximum :',maxl)
      feature_d[f],label_d[f]=hugedata(f,feature_d[f],label_d[f],maxl)
 
 print ('---')
@@ -388,19 +467,34 @@ features_train={}
 features_test={}
 labels_train={}
 labels_test={}
-
+print ('---')
 for f in usedclassifFinal:
-    print f,len(feature_d[f]),len(label_d[f])
+    print 'split data',f
     features_train[f], features_test[f], labels_train[f], labels_test[f] = train_test_split(feature_d[f],label_d[f],test_size=0.2, random_state=42)
 
+print ('---')
 for f in usedclassifFinal:
     print 'train',f,len(features_train[f]),len(labels_train[f])
     print 'test',f,len(features_test[f]),len(labels_test[f])
+    print ('----')
 
 features_aug_train={}
 labels_aug_train={} 
-  
+
+usemhuege=[name for name in usedclassifFinal if name not in hugeClass]
+for f in usemhuege:
+     print('upscale training data on :',f)
+     features_train[f],labels_train[f]=updscaledata(features_train[f],labels_train[f],classConso[f])
+     print('upscale test data on :',f)
+     features_test[f],labels_test[f]=updscaledataSimple(features_test[f],labels_test[f],classConso[f])
+
+print ('---')
+for f in usedclassifFinal:   
+    print 'training after upscale ',f,len(features_train[f]),len(labels_train[f])
+    print 'test after upscale ',f,len(features_test[f]),len(labels_test[f])
+
 for f in usedclassifFinal:
+    print('augmentated data on :',f)
     features_aug_train[f],labels_aug_train[f]=geneaug(f,features_train[f],labels_train[f])
     
 for f in usedclassifFinal:
@@ -429,34 +523,13 @@ y_train = np.array(labels_train_final)
 
 X_test = np.array(features_test_final)
 y_test = np.array(labels_test_final)
-#this is already in greyscale
-# use only one of the 3 color channels as greyscale info
-#X = dataset[:,:, :,1]
-
-#print 'dataset shape is now: ', X.shape
-#print('X22 as example:', X[22])
-## 
-#y = np.array(label_list)
-## sampling item 22
-#print ('y22 as example:',y[22])
-#
-#print ('Xshape : ',X.shape)
-#print ('yshape : ',y.shape)
-#
-#
-#X_train, X_intermediate, y_train, y_intermediate = train_test_split(X, y, test_size=0.5, random_state=42)
-#X_val, X_test, y_val, y_test = train_test_split(X_intermediate, y_intermediate, test_size=0.5, random_state=42)
+ 
 print '-----------FINAL----------------'
 print ('Xtrain :',X_train.shape)
-
 print ('Xtest : ',X_test.shape)
 print ('ytrain : ',y_train.shape)
-
 print ('ytest : ',y_test.shape)
-    
-#min_val=np.min(X_train)
-#max_val=np.max(X_train)
-#print 'Xtrain', min_val, max_val
+
 #    
 for f in usedclassifFinal:
 #    print f,classNumberNewTr[f]
@@ -472,10 +545,10 @@ print class_weights
 
 pickle.dump(class_weights, open( os.path.join(pickle_dir,"class_weights.pkl"), "wb" ))
 pickle.dump(X_train, open( os.path.join(pickle_dir,"X_train.pkl"), "wb" ))
-pickle.dump(X_test, open( os.path.join(pickle_dir,"X_test.pkl"), "wb" ))
+pickle.dump(X_test, open( os.path.join(pickle_dir,"X_val.pkl"), "wb" ))
 
 pickle.dump(y_train, open( os.path.join(pickle_dir,"y_train.pkl"), "wb" ))
-pickle.dump(y_test, open( os.path.join(pickle_dir,"y_test.pkl"), "wb" ))
+pickle.dump(y_test, open( os.path.join(pickle_dir,"y_val.pkl"), "wb" ))
 
 
 
