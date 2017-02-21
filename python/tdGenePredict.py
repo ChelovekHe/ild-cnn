@@ -16,6 +16,7 @@ from Tkinter import *
 import scipy
 import PIL
 import cPickle as pickle
+import random
 
 #from PIL import Image as ImagePIL
 from PIL import Image,ImageFont, ImageDraw
@@ -45,15 +46,24 @@ isGre=False
 #HUG='predict_S106530'   
 HUG='predict_S14740' 
 #HUG='predict_S15440'
+#HUG='predict_S107260'
+thrpatch = 0.8 #threshold for pad acceptance (recovery)
+thrproba =0.7 #thresholm proba for generation of predicted images
+thrprobaUIP=0.7 #threshold proba for UIP
+thrprobaMerge=0.7 #threshold proba for UIP
 
-#HUG='HUG'
-#subDir='ILDt'
+
 predictout='predicted_results'
 predictout3d='predicted_results_3d'
 predictout3dn='predicted_results_3dn'
 predictout3d1='predicted_results_3dn1'
 predictout3dr='predicted_results_3dr'
 predictoutmerge='predicted_results_merge'
+dicompadirm='predict_dicom'
+dicomcross='cross'
+dicomfront='front'
+dicomcross_merge='merge'
+
 source_name='source'
 jpegpath='jpegpath'
 jpegpath3d='jpegpath3d'
@@ -106,21 +116,17 @@ threeFileBot='uipbot.html'
 dimpavx=16
 dimpavy=16
 pxy=float(dimpavx*dimpavy)
-#imageDepth=65535 #number of bits used on dicom images (2 **n) 13 bits
+ 
 imageDepth=8191 #number of bits used on dicom images (2 **n) 13 bits
 #imageDepth=255 #number of bits used on dicom images (2 **n) 13 bits
 #patch overlapp tolerance
-thrpatch = 0.8 #threshold for pad acceptance (recovery)
-thrproba =0.5 #thresholm proba for generation of predicted images
-thrprobaUIP=0.5 #threshold proba for UIP
-thrprobaMerge=0.5 #threshold proba for UIP
 
 cwd=os.getcwd()
 (cwdtop,tail)=os.path.split(cwd)
 dirHUG=os.path.join(cwdtop,HUG)
 
+print dirHUG
 listHug= [ name for name in os.listdir(dirHUG) if os.path.isdir(os.path.join(dirHUG, name)) ]
-
 print listHug
 
 font5 = ImageFont.truetype( 'arial.ttf', 5)
@@ -129,8 +135,8 @@ font20 = ImageFont.truetype( 'arial.ttf', 20)
 
 eferror=os.path.join(dirHUG,'gp3d.txt')
    
-picklein_file = '../pickle_ex/pickle_ex66'
-picklein_file_front = '../pickle_ex/pickle_ex68'
+picklein_file = '../pickle_ex/pickle_ex61'
+picklein_file_front = '../pickle_ex/pickle_ex63'
 modelname='ILD_CNN_model.h5'
 avgPixelSpacing=0.734   # average pixel spacing
 ###############################################################
@@ -612,7 +618,7 @@ def wtebres(dirf,tab,dimtabx,slicepitch,lungm,ty):
     remove_folder(bgdirf)
     os.mkdir(bgdirf)
     fxs=float(slicepitch/avgPixelSpacing )
-    print 'fxs',fxs
+#    print 'fxs',fxs
    
 #    print tab[0].shape[0]
     ntd=int(round(fxs*tab[0].shape[0],0))
@@ -708,10 +714,11 @@ def tagviewn(tab,label,pro,nbr,x,y):
     viseg=cv2.putText(tab,str(nbr)+' '+label+' '+pro,(x+deltax, y+deltay+10), font,gro,col,1)
     return viseg
       
-def  visua(dirf,probaInput,patch_list,dimtabx,dimtaby,slnt,predictout,sroi,scan_bmp,sou):
+def  visua(dirf,probaInput,patch_list,dimtabx,dimtaby,slnt,predictout,sroi,scan_bmp,sou,dcmf,dct):
 
     print('visualisation',scan_bmp)
-
+    rsuid=random.randint(0,1000)
+   
     sliceok=[]
     (dptop,dptail)=os.path.split(dirf)
     predictout_dir = os.path.join(dirf, predictout)
@@ -725,10 +732,13 @@ def  visua(dirf,probaInput,patch_list,dimtabx,dimtaby,slnt,predictout,sroi,scan_
     #directory name with predict out dabasase, will be created in current directory
     preprob=probaInput
  
-    dirpatientfdbsource=os.path.join(dirf,sou)
-    dirpatientfdbsource=os.path.join(dirpatientfdbsource,scan_bmp)
+    dirpatientfdbsource1=os.path.join(dirf,sou)
+    dirpatientfdbsource=os.path.join(dirpatientfdbsource1,scan_bmp)
     dirpatientfdbsroi=os.path.join(dirf,sroi)
     listbmpscan=os.listdir(dirpatientfdbsource)
+    if dct:
+        listdcm=[name for name in  os.listdir(dirpatientfdbsource1) if name.lower().find('.dcm')>0]
+
 
     listlabelf={}
     sroiE=False
@@ -738,7 +748,36 @@ def  visua(dirf,probaInput,patch_list,dimtabx,dimtaby,slnt,predictout,sroi,scan_
   
     for img in listbmpscan:
         
-        slicenumber= rsliceNum(img,'_','.'+typei)
+        slicenumber= rsliceNum(img,'_','.'+typei)       
+        if dct:
+            for imgdcm in listdcm:
+                 FilesDCM =(os.path.join(dirpatientfdbsource1,imgdcm))  
+                 RefDs = dicom.read_file(FilesDCM)
+                 slicenumberdicom=int(RefDs.InstanceNumber)
+                 if slicenumberdicom==slicenumber:
+                     dsr= RefDs.pixel_array
+                     dsr= dsr-dsr.min()
+                     c=float(255)/dsr.max()
+                     dsr=dsr*c     
+                     dsr = dsr.astype('uint8')
+                     dsr = cv2.cvtColor(dsr, cv2.COLOR_GRAY2RGB)
+                     RefDs.PhotometricInterpretation='RGB'
+#                     RefDs.HighBit=8
+                     RefDs.BitsAllocated=8
+                     RefDs.SamplesPerPixel=3
+                     RefDs.PlanarConfiguration=0
+                     RefDs.SeriesDescription='WithPredict'                   
+                     RefDs.StudyInstanceUID                 =str(rsuid)  
+#                     RefDs.BitsStored=8
+    #                 RefDs.MediaStorageSOPClassUID = 'Secondary Capture Image Storage'
+    #                 RefDs.MediaStorageSOPInstanceUID = '1.3.6.1.4.1.9590.100.1.1.111165684411017669021768385720736873780'
+    #                 RefDs.ImplementationClassUID = '1.3.6.1.4.1.9590.100.1.0.100.4.0'
+                     break
+#                 RefDs.PixelData=dsr
+#                 FilesDCMW =(os.path.join(dcmf,imgdcm)) 
+#                 RefDs.save_as(FilesDCMW)
+
+       
         imgt = np.zeros((dimtabx,dimtaby,3), np.uint8)
         listlabelaverage={}
         listlabel={}
@@ -798,8 +837,12 @@ def  visua(dirf,probaInput,patch_list,dimtabx,dimtaby,slnt,predictout,sroi,scan_
         tablscan = cv2.cvtColor(tablscan, cv2.COLOR_BGR2RGB)
 
         vis=drawContour(imgt,listlabel,dimtabx,dimtaby)
-#        print slicenumber,type(vis[0][0]),vis.shape,type(tablscan[0][0]),tablscan.shape
+#        print slicenumber,dsr.shape, type(dsr[0][0][0]),type(vis[0][0][0]),vis.shape,type(tablscan[0][0][0]),tablscan.shape
+#        ooo
+#        print slicenumber
         imn=cv2.add(tablscan,vis)
+       
+        
 
         if foundp:        
             for ll in listlabelrec:
@@ -816,9 +859,16 @@ def  visua(dirf,probaInput,patch_list,dimtabx,dimtaby,slnt,predictout,sroi,scan_
         (topw,tailw)=os.path.split(picklein_file)
         t5= tailw
         imn=tagviews(imn,t0,0,10,t1,0,20,t2,(dimtabx/2)-10,dimtaby-10,t3,0,38,t4,0,dimtaby-10,t5,0,dimtaby-20) 
+        if dct:            
+            imncop=cv2.resize(imn,(dsr.shape[0],dsr.shape[1]))
+            dsr=cv2.add(dsr,imncop)
+            RefDs.PixelData=dsr
+            FilesDCMW =(os.path.join(dcmf,imgdcm)) 
+            RefDs.save_as(FilesDCMW)
+        
         imn = cv2.cvtColor(imn, cv2.COLOR_BGR2RGB)
         predict_outFile=os.path.join( predictout_dir,img) 
-        cv2.imwrite(predict_outFile,imn)    
+        cv2.imwrite(predict_outFile,imn) 
         errorfile.write('\n'+'number of labels in :'+str(dptop)+' '+str(dptail)+str (img)+'\n' )
 #    print listlabelf
     for classlabel in listlabelf:  
@@ -1017,9 +1067,10 @@ def tagviewct(tab,label,x,y):
 
 
 
-def reshapepatern(dirf,tabpx,dimtabxn,dimtaby,slnt,slicepitch,predictout,sou):
+def reshapepatern(dirf,tabpx,dimtabxn,dimtaby,slnt,slicepitch,predictout,sou,dcmf):
     print 'reshape pattern'
     """reshape pattern table """   
+    rsuid=random.randint(0,1000)
     (dptop,dptail)=os.path.split(dirf)
     
     predictout_dir = os.path.join(dirf, predictout)
@@ -1030,11 +1081,12 @@ def reshapepatern(dirf,tabpx,dimtabxn,dimtaby,slnt,slicepitch,predictout,sou):
     print 'used patterns :',listp
     fxs=float(avgPixelSpacing/slicepitch )
     
-    dirpatientfdb=os.path.join(dirf,sou)
-    dirpatientfdb=os.path.join(dirpatientfdb,scan_bmp)
+    dirpatientfdb1=os.path.join(dirf,sou)
+    dirpatientfdb=os.path.join(dirpatientfdb1,scan_bmp)
     dirpatientfsdb=os.path.join(dirf,sroi)
     listbmpscan=os.listdir(dirpatientfdb)
-    
+    listdcm=[name for name in  os.listdir(dirpatientfdb1) if name.lower().find('.dcm')>0]
+   
 #    print dirpatientfdb
     tablscan=np.zeros((slnt,dimtaby,dimtaby,3),np.uint8)
     sroiE=False
@@ -1044,6 +1096,7 @@ def reshapepatern(dirf,tabpx,dimtabxn,dimtaby,slnt,slicepitch,predictout,sou):
   
     for img in listbmpscan:
         slicenumber= rsliceNum(img,'_','.'+typei)
+        
         if sroiE:
             for imgsroi in listbmpsroi:
                 slicenumbersroi=rsliceNum(imgsroi,'_','.'+typeiroi1)
@@ -1079,8 +1132,33 @@ def reshapepatern(dirf,tabpx,dimtabxn,dimtaby,slnt,slicepitch,predictout,sou):
     for scan in range(0,slnt):
                 pf=os.path.join(predictout_dir,'tr_'+str(scan)+'.'+typei)
                 imcolor = cv2.cvtColor(impre[scan], cv2.COLOR_BGR2RGB)
-                cv2.imwrite(pf,cv2.add(imcolor,tablscan[scan]))
-           
+                imn=cv2.add(imcolor,tablscan[scan])
+                cv2.imwrite(pf,imn)
+                
+                for imgdcm in listdcm:
+                 FilesDCM =(os.path.join(dirpatientfdb1,imgdcm))  
+                 RefDs = dicom.read_file(FilesDCM)
+                 slicenumberdicom=int(RefDs.InstanceNumber)
+                 if slicenumberdicom==scan:
+                     dsr= RefDs.pixel_array
+                     dsr= dsr-dsr.min()
+                     c=float(255)/dsr.max()
+                     dsr=dsr*c     
+                     dsr = dsr.astype('uint8')
+                     dsr = cv2.cvtColor(dsr, cv2.COLOR_GRAY2RGB)
+                     RefDs.PhotometricInterpretation='RGB'
+                     RefDs.HighBit=8
+                     RefDs.BitsAllocated=8
+                     RefDs.SamplesPerPixel=3
+                     RefDs.BitsStored=8     
+                     RefDs.StudyInstanceUID                 =str(rsuid)
+                     imncop=cv2.resize(imn,(dsr.shape[0],dsr.shape[1]))
+                     dsr=cv2.add(dsr,imncop)
+                     RefDs.PixelData=dsr
+                     FilesDCMW =(os.path.join(dcmf,imgdcm)) 
+                     RefDs.save_as(FilesDCMW)
+                     break
+                          
     return tabx
 
 
@@ -1261,10 +1339,24 @@ for f in listHug:
     jpegpathdir=os.path.join(dirf,jpegpadirm)
     remove_folder(jpegpathdir)
     os.mkdir(jpegpathdir) 
-#    bgdirf=os.path.join(dirf,bgdir)
-#    remove_folder(bgdirf)
-#    os.mkdir(bgdirf)   
-#    listsliceok=[]
+    
+    dicompathdir=os.path.join(dirf,dicompadirm)
+    remove_folder(dicompathdir)
+    os.mkdir(dicompathdir) 
+    
+    dicompathdircross=os.path.join(dicompathdir,dicomcross)
+
+    remove_folder(dicompathdircross)
+    os.mkdir(dicompathdircross) 
+    
+    dicompathdirfront=os.path.join(dicompathdir,dicomfront)
+    remove_folder(dicompathdirfront)
+    os.mkdir(dicompathdirfront) 
+    
+    dicompathdirmerge=os.path.join(dicompathdir,dicomcross_merge)
+    remove_folder(dicompathdirmerge)
+    os.mkdir(dicompathdirmerge) 
+    
     if isGre:
         print 'is gre'
 
@@ -1287,8 +1379,9 @@ for f in listHug:
         pickle.dump(patch_list_cross, open( os.path.join(dirf,"patch_list_cross"), "wb" ))
 #        proba_cross= pickle.load( open( os.path.join(dirf,"proba_cross"), "r" ))
 #        patch_list_cross= pickle.load( open( os.path.join(dirf,"patch_list_cross"), "r" ))
-#        sliceok = visua(dirf,proba_cross,patch_list_cross,dimtabx,dimtabx,slnt,predictout,sroi,scan_bmp,source)
+        sliceok = visua(dirf,proba_cross,patch_list_cross,dimtabx,dimtabx,slnt,predictout,sroi,scan_bmp,source,dicompathdircross,True)
 ###        
+
         tabresScan=reshapeScan(tabscanScan,slnt,dimtabx)
         dimtabxn,dimtabyn,tabScan3d=wtebres(dirf,tabresScan,dimtabx,slicepitch,lung_name_gen,'scan')
    
@@ -1308,7 +1401,7 @@ for f in listHug:
         pickle.dump(patch_list_front, open( os.path.join(dirf,"patch_list_front"), "wb" ))
 #        proba_front=pickle.load(open( os.path.join(dirf,"proba_front"), "rb" ))
 #        patch_list_front=pickle.load(open( os.path.join(dirf,"patch_list_front"), "rb" ))      
-        visua(dirf,proba_front,patch_list_front,dimtabxn,dimtabx,dimtabyn,predictout3d,sroid,transbmp,source)
+        visua(dirf,proba_front,patch_list_front,dimtabxn,dimtabx,dimtabyn,predictout3d,sroid,transbmp,source,dicompathdirfront,False)
 #####        
         proba_cross=pickle.load(open( os.path.join(dirf,"proba_cross"), "rb" ))
         patch_list_cross=pickle.load(open( os.path.join(dirf,"patch_list_cross"), "rb" ))
@@ -1321,13 +1414,13 @@ for f in listHug:
         tabpx=genecross(dirf,proba_front,patch_list_front,slnt,slicepitch,dimtabxn,dimtabyn,predictout3dn)
 #        pickle.dump(tabpx, open( os.path.join(dirf,"tabpx"), "wb" ))
 #        tabpx=pickle.load(open( os.path.join(dirf,"tabpx"), "rb" ))
-        tabx=reshapepatern(dirf,tabpx,dimtabxn,dimtabx,slnt,slicepitch,predictout3d1,source)        
+        tabx=reshapepatern(dirf,tabpx,dimtabxn,dimtabx,slnt,slicepitch,predictout3d1,source,dicompathdirfront)        
 #        pickle.dump(tabx, open( os.path.join(dirf,"tabx"), "wb" ))        
 #        tabx=pickle.load(open( os.path.join(dirf,"tabx"), "rb" ))
         
         proba_merge,patch_list_merge=mergeproba(proba_cross,patch_list_cross,tabx,slnt,dimtabx,dimtabx)
 
-        visua(dirf,proba_merge,patch_list_merge,dimtabx,dimtabx,slnt,predictoutmerge,sroi,scan_bmp,source)
+        visua(dirf,proba_merge,patch_list_merge,dimtabx,dimtabx,slnt,predictoutmerge,sroi,scan_bmp,source,dicompathdirmerge,True)
         genethreef(dirf,patch_list_merge,proba_merge,slicepitch,dimtabx,dimtabx,dimpavx,slnt,'merge')
 
     errorfile.write('completed :'+f)
