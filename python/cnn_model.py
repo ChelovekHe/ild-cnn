@@ -23,18 +23,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 For more information please read the README file. The files can also 
 be found at: https://github.com/intact-project/ild-cnn
 '''
-
+import os
 import sys
 import cv2
 import cPickle as pickle
 import numpy as np
 import ild_helpers as H
-
+#import h5py
+import keras
+import theano
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Flatten, Activation
 from keras.layers.convolutional import Convolution2D, MaxPooling2D,AveragePooling2D
 from keras.layers.advanced_activations import LeakyReLU
-
+print keras.__version__
+print theano.__version__
 # debug
 # from ipdb import set_trace as bp
 
@@ -107,6 +110,7 @@ def get_model(input_shape, output_shape, params):
     # Add Dense layers and Output to model
     # model.add(Dense(int(params['k']*get_FeatureMaps(params['cl'], params['fp']))/params['pf']*6, init='he_uniform', activation=LeakyReLU(0)))
     model.add(Dense(int(params['k']*get_FeatureMaps(params['cl'], params['fp']))/params['pf']*6, init='he_uniform'))
+    
     print 'output_dimension : ', int(params['k']*get_FeatureMaps(params['cl'], params['fp']))/params['pf']*6
 
     # model.add(Activation('relu'))
@@ -121,16 +125,26 @@ def get_model(input_shape, output_shape, params):
     model.add(Dropout(params['do']))
     model.add(Dense(output_shape[1], init='he_uniform', activation='softmax'))
 
+
+
+#sk modif for decay, works only with ADAM
+
+    decay = 0.001
+    lr=0.001
+    
     # Compile model and select optimizer and objective function
     if params['opt'] not in ['Adam', 'Adagrad', 'SGD']:
         sys.exit('Wrong optimizer: Please select one of the following. Adam, Adagrad, SGD')
     if get_Obj(params['obj']) not in ['MSE', 'categorical_crossentropy']:
         sys.exit('Wrong Objective: Please select one of the following. MSE, categorical_crossentropy')
-    model.compile(optimizer=params['opt'], loss=get_Obj(params['obj']))
+#    model.compile(optimizer=params['opt'], loss=get_Obj(params['obj']))
+
+    optimizer=keras.optimizers.Adam(lr=lr,decay=decay)
+    model.compile(optimizer=optimizer, loss=get_Obj(params['obj']))
 
     return model
 
-def train(x_train, y_train, x_val, y_val, params):
+def train(x_train, y_train, x_val, y_val, params,class_weights):
     ''' TODO: documentation '''
 
     
@@ -170,19 +184,21 @@ def train(x_train, y_train, x_val, y_val, params):
 
     print 'x_shape is: ', x_train.shape
 
-
-    model = get_model(x_train.shape, y_train.shape, params)
-
+    if os.path.exists('../pickle/ILD_CNN_model.h5'):
+        print 'model exist'   
+        model= H.load_model('../pickle/ILD_CNN_model.h5')
+    else:
+        print 'restart from 0'   
+        model = get_model(x_train.shape, y_train.shape, params)
     # Counters-buffers
     maxf         = 0
     maxacc       = 0
     maxit        = 0
     maxtrainloss = 0
     maxvaloss    = np.inf
-    p            = 0
-    it           = 0
     best_model   = model
-
+    it           = 0    
+    p            = 0
     # Open file to write the results
     open('../pickle/' + params['res_alias']+parameters_str+'.csv', 'a').write('Epoch, Val_fscore, Val_acc, Train_loss, Val_loss\n')
     open('../pickle/' + params['res_alias']+parameters_str+'-Best.csv', 'a').write('Epoch, Val_fscore, Val_acc, Train_loss, Val_loss\n')
@@ -194,7 +210,7 @@ def train(x_train, y_train, x_val, y_val, params):
 
         # Fit the model for one epoch
         print('Epoch: ' + str(it))
-        history = model.fit(x_train, y_train, batch_size=100, nb_epoch=1, validation_data=(x_val,y_val), shuffle=True)
+        history = model.fit(x_train, y_train, batch_size=250, nb_epoch=1, validation_data=(x_val,y_val), shuffle=True,class_weight=class_weights)
 
     
         # Evaluate models
@@ -209,7 +225,7 @@ def train(x_train, y_train, x_val, y_val, params):
         # check if current state of the model is the best and write evaluation metrics to file
         if fscore > maxf*params['tolerance']:  # if fscore > maxf*params['tolerance']:
             print 'fscore is still bigger than last iterations fscore + 5%'
-            p            = 0  # restore patience counter
+            #p            = 0  # restore patience counter
             best_model   = model  # store current model state
             maxf         = fscore 
             maxacc       = acc
@@ -220,7 +236,7 @@ def train(x_train, y_train, x_val, y_val, params):
             print(np.round(100*cm/np.sum(cm,axis=1).astype(float)))
 
             open('../pickle/' + params['res_alias']+parameters_str+'-Best.csv', 'a').write(str(str(maxit)+', '+str(maxf)+', '+str(maxacc)+', '+str(maxtrainloss)+', '+str(maxvaloss)+'\n'))
-
+            H.store_model(best_model)
         it += 1
     
     print('Max: fscore:', maxf, 'acc:', maxacc, 'epoch: ', maxit, 'train loss: ', maxtrainloss, 'validation loss: ', maxvaloss)
@@ -229,23 +245,33 @@ def train(x_train, y_train, x_val, y_val, params):
 
 
 def prediction(X_test, y_test, params):
-    model = H.load_model()
+    f=open ('../pickle/res.txt','w')
+#    model = H.load_model()
+    model= H.load_model('../pickle/ILD_CNN_model.h5')
     model.compile(optimizer='Adam', loss=get_Obj(params['obj']))
 
-    y_classes = model.predict_classes(X_test, batch_size=250)
+    y_classes = model.predict_classes(X_test, batch_size=100)
     y_val_subset = y_classes[:]
     y_test_subset = y_test[:]
 
     # argmax functions shows the index of the 1st occurence of the highest value in an array
-    y_actual = np.argmax(y_val_subset)
-    y_predict = np.argmax(y_test_subset)
-
+#    y_actual = np.argmax(y_val_subset)
+#    y_predict = np.argmax(y_test_subset)
+    
     fscore, acc, cm = H.evaluate(y_test_subset, y_val_subset)
 
     print 'f-score is : ', fscore
     print 'accuray is : ', acc
     print 'confusion matrix'
     print cm
-
+    f.write('f-score is : '+ str(fscore)+'\n')
+    f.write( 'accuray is : '+ str(acc)+'\n')
+    f.write('confusion matrix\n')
+    n= cm.shape[0]
+    for i in range (0,n):
+        for j in range (0,n):
+           f.write(str(cm[i][j])+' ')
+        f.write('\n')
+    f.close()
     open('../' + 'TestLog.csv', 'a').write(str(params['res_alias']) + ', ' + str(str(fscore) + ', ' + str(acc)+'\n'))
     return
