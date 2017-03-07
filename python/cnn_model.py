@@ -36,6 +36,7 @@ from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Flatten, Activation
 from keras.layers.convolutional import Convolution2D, MaxPooling2D,AveragePooling2D
 from keras.layers.advanced_activations import LeakyReLU
+from keras.models import load_model
 print keras.__version__
 print theano.__version__
 # debug
